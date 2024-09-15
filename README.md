@@ -24,8 +24,7 @@ Additionally, the software uses an additional camera to show a close-up of the p
 - Program the overlay of different shots in Record Multiple Shots Mode
 - Rename certain variables to make the code more user friendly
 - Program Entry Point detection for the pins camera
-- Program Reading the Score (pins left standing) from the pins camera
-- Re-structure the ball tracker to not analyse the saved video but each frame live as it is recorded
+- Program Reading the Score (pins left standing) from the pins camera (work in progress)
 - Program an Oil Pattern overlay
 - Program a web-service so data can be made accessible to the user via a web portal with a login
 - Translate the program to different languages

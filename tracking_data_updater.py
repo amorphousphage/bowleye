@@ -3,7 +3,6 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 import json
 import time
 import datetime
-import threading
 import os
 
 # Create a class to run the Tracking Data updater in

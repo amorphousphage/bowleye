@@ -122,6 +122,38 @@ class LaneTab(QWidget):
         # Connect the new_game_button to the function to select the first player, increase the game counter by one and reset the frame counter
         self.edit_player_button.clicked.connect(self.confirmPlayers)
 
+        # Create two labels displaying the pins left standing
+        self.pins_standing_numbers_label = QLabel()
+        self.pins_standing_name_label = QLabel()
+        self.col1_layout.addWidget(self.pins_standing_numbers_label)
+        self.col1_layout.addWidget(self.pins_standing_name_label)
+
+        # Connect the scorer signal to update the pins standing labels
+        signal_router.pins_standing_signal.connect(self.DisplayPinsStanding)
+
+        # Define a dictionary of spare names
+        self.spare_names = {
+            "Left Double Wood": ['2', '8'],
+            "Right Double Wood": ['3', '9'],
+            "Center Double Wood": ['1', '5'],
+            "Left Baby Split": ['2', '7'],
+            "Right Baby Split": ['3', '10'],
+            "Seven Ten": ['7', '10'],
+            "The Left Christmas Tree": ['2', '7', '10'],
+            "The Right Christmas Tree": ['3', '7', '10'],
+            "The Sour Apple": ['5', '7', '10'],
+            "The Left Bucket": ['2', '4', '5', '8'],
+            "The Right Bucket": ['3', '5', '6', '9'],
+            "The Center Bucket": ['1', '2', '3', '5'],
+            "The Big Four": ['4', '6', '7', '10'],
+            "The Left Rail": ['1', '2', '4', '7'],
+            "The Right Rail": ['1', '3', '6', '10'],
+            "The Left Super Washout": ['1', '2', '4', '6', '10'],
+            "The Right Super Washout": ['1', '3', '4', '6', '7'],
+            "The Left Greek Church": ['4', '6', '7', '8', '10'],
+            "The Right Greek Church": ['4', '6', '7', '9', '10']
+        }
+
         # Create a layout for the recorder and its switch
         self.recorder_layout = QHBoxLayout()
         # Create the switch to enable the recorder
@@ -810,15 +842,17 @@ class LaneTab(QWidget):
     @pyqtSlot(str)
     def UpdateRecorderStatus(self, status):
         if status == "recording":
-            self.recorder_status_label.setText("Recording...")
+            self.recorder_status_label.setText("Recording and Tracking...")
             self.recorder_status_label.setStyleSheet("color: red;")
+            self.pins_standing_name_label.setText("")
+            self.pins_standing_numbers_label.setText("")
 
         if status == "generating video":
             self.recorder_status_label.setText("Saving Videos...")
             self.recorder_status_label.setStyleSheet("color: orange;")
 
         if status == "tracking":
-            self.recorder_status_label.setText("Tracking Shot...")
+            self.recorder_status_label.setText("Calculating Track and Values...")
             self.recorder_status_label.setStyleSheet("color: blue;")
 
         if status == "resetting":
@@ -873,6 +907,26 @@ class LaneTab(QWidget):
 
         # Stop the Recorder if it is running
         self.StopRecorder()
+
+    @pyqtSlot(list)
+    def DisplayPinsStanding(self,pins_standing):
+        # Update the numbers label with the numbers:
+        if pins_standing:  # If not empty, display the standing pins
+            self.pins_standing_numbers_label.setText(f"Pins left standing: {pins_standing}")
+        else:  # If empty, it's a strike
+            self.pins_standing_numbers_label.setText("Strike!")
+        # Find the spare name corresponding to the current standing pins
+        spare_name = None
+        for name, pins in self.spare_names.items():
+            if pins_standing == pins:
+                spare_name = name
+                break
+
+        # Update the spare name label if a match is found
+        if spare_name:
+            self.pins_standing_name_label.setText(spare_name)
+        else:
+            self.pins_standing_name_label.setText("")
 
     # Function to run when the program is closed
     def closeEvent(self, event):

@@ -1,7 +1,7 @@
 # import used packages
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTabWidget, QGridLayout, QComboBox, QSpinBox, QDoubleSpinBox, QSpacerItem, QSizePolicy, QDesktopWidget, QToolTip, QDialog, QMessageBox
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, QTimer, QObject
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen
+from PyQt5.QtCore import Qt, QTimer, QObject, QPoint, pyqtSignal
 import configparser
 import os
 import cv2
@@ -100,6 +100,119 @@ class LaneInputDialog(QDialog):
         layout.addWidget(self.okButton)
 
         self.setLayout(layout)
+
+# If the position of the pins need to be determined, the following window will be generated
+class PinSelectionWindow(QWidget):
+    pin_coordinates_signal = pyqtSignal(dict)
+
+    def __init__(self, frame, lane_number):
+        super().__init__()
+        # Define the variables used
+        self.frame = frame
+        self.selected_pin = None
+
+        # Obtain the settings
+        self.settings_manager = SettingsManager(defaults_path='defaults.cfg', settings_path=f'settings_lane_{lane_number}.cfg')
+        settings = self.settings_manager.GetSettings()
+        pin_coordinates_str = settings['Pin Scorer'].get('pin_coordinates')
+        # Convert the pin coordinates to a python array
+        if isinstance(pin_coordinates_str, str):
+            self.pin_coordinates = ast.literal_eval(pin_coordinates_str)
+        else:
+            self.pin_coordinates = pin_coordinates_str
+
+        # Calculate the scaling of the frame down to 600x400 pixel for display to set the correct coordinates
+        self.height_scalar = 400 / settings['Recorder'].get('pins_camera_x_resolution')
+        self.width_scalar = 600 / settings['Recorder'].get('pins_camera_y_resolution')
+        print (self.height_scalar, self.width_scalar)
+
+        self.initUI()
+
+    def initUI(self):
+        # Set window properties
+        self.setWindowTitle("Pin Placement Selection")
+        self.setGeometry(100, 100, 800, 600)
+
+        # Create the main layout
+        main_layout = QHBoxLayout(self)
+
+        # Left side - Pin Buttons
+        button_layout = QVBoxLayout()
+        for i in range(1, 11):
+            button = QPushButton(f"{i}", self)
+            button.clicked.connect(self.PinButtonClicked)
+            button_layout.addWidget(button)
+        main_layout.addLayout(button_layout)
+
+        # Right side - Image Display
+        self.rightside_layout = QVBoxLayout(self)
+        self.image_label = QLabel(self)
+        self.image_label.setAlignment(Qt.AlignTop)
+        self.rightside_layout.addWidget(self.image_label)
+
+        # Right side - Instructions
+        self.instructions_label = QLabel(self)
+        self.instructions_label.setText(
+            "- Please select a pin on the left and then click the pin's neckband in the image.<br>"
+            "- For the 5 pin, click on the pin's head as the neck band should not be visible.<br>"
+            "- Simply close this window when all pins have been marked."
+        )
+        self.selected_pin_label = QLabel(self)
+        self.selected_pin_label.setText("Selected Pin: Currently no pin is selected.")
+        self.rightside_layout.addWidget(self.instructions_label)
+        self.rightside_layout.addWidget(self.selected_pin_label)
+
+        # Add the right side layout to the main layout
+        main_layout.addLayout(self.rightside_layout)
+
+        # Make a copy of the frame without added pin coordinates
+        self.empty_frame = self.frame.copy()
+
+        # Display the frame
+        self.DisplayPinFrame(self.frame)
+
+    def DisplayPinFrame(self, frame):
+        # Resize the image using OpenCV
+        resized_frame = cv2.resize(frame, (600, 400), interpolation=cv2.INTER_AREA)
+
+        # Draw all the coordinates of the pins into the frame
+        for pin_number, (x, y) in self.pin_coordinates.items():
+            cv2.circle(resized_frame, (round(x * self.width_scalar), round(y * self.height_scalar)), 3, (255, 0, 0), -1)
+            cv2.putText(resized_frame, str(pin_number), (round(x * self.width_scalar) - 3, round(y * self.height_scalar) - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 0, 0), 2)
+
+        # Convert the resized image to QImage
+        height, width, channel = resized_frame.shape
+        bytes_per_line = 3 * width
+        q_img = QImage(resized_frame.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
+
+        # Convert QImage to QPixmap and set it on the QLabel
+        pixmap = QPixmap.fromImage(q_img)
+        self.image_label.setPixmap(pixmap)
+
+        # Enable mouse click event on the image
+        self.image_label.mousePressEvent = self.ImageClicked
+
+    def PinButtonClicked(self):
+        sender = self.sender()
+        self.selected_pin = sender.text()
+        self.selected_pin_label.setText(f"Selected Pin: Pin No. {self.selected_pin} is currently selected.")
+
+    def ImageClicked(self, event):
+        if self.selected_pin:
+            self.empty_frame_copy = self.empty_frame.copy()
+            pos = event.pos()
+            # Store the selected coordinate for the pin
+            self.pin_coordinates[self.selected_pin] = (round(pos.x() / self.width_scalar), round(pos.y() / self.height_scalar))
+            print(f"Pin {self.selected_pin} selected at {round(pos.x() / self.width_scalar)}, {round(pos.y() / self.height_scalar)}")
+            self.DisplayPinFrame(self.empty_frame_copy)
+        else:
+            QMessageBox.warning(None, "No pin was selected.", "First select a pin on the left and subsequently click on the pins neck band in the image (or the pin head for the 5 pin)")
+
+    def closeEvent(self, event):
+        # Emit the signal with the pin coordinates when the window is closed
+        self.pin_coordinates_signal.emit(self.pin_coordinates)
+        event.accept()  # Accept the event to close the window
 
 # Create a class, that displays a question mark besides the label and once clicked, displays a tool tip
 class HelpIconLabel(QLabel):
@@ -259,7 +372,7 @@ class SettingsTab(QWidget):
         self.settingsTabWidget.clear()
 
         # Define the categories
-        settings_categories = ["Lane Setup", "Recorder", "Ball Detection", "Calculations", "Video Export"]
+        settings_categories = ["Lane Setup", "Recorder", "Ball Detection", "Calculations", "Video Export", "Pin Scorer"]
 
         # Add the setting_categories as tabs to the widget
         for setting in settings_categories:
@@ -700,6 +813,25 @@ class SettingsTab(QWidget):
             tab_layout.addLayout(self.thickness_arrow_label, 9, 0)
             tab_layout.addWidget(self.thickness_arrow_item, 9, 1)
 
+        # Set the GUI elements for the tab "Pin Scorer"
+        elif setting == "Pin Scorer":
+
+            self.time_pin_reading_after_start_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
+                                                                        "Select how many frames should be recorded since the pin camera started before the score should be read")
+            self.time_pin_reading_after_start_item = QSpinBox()
+            self.time_pin_reading_after_start_item.setMinimum(10)
+            self.time_pin_reading_after_start_item.setMaximum(200)
+            self.time_pin_reading_after_start_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_start'))
+            tab_layout.addLayout(self.time_pin_reading_after_start_label, 1, 0)
+            tab_layout.addWidget(self.time_pin_reading_after_start_item, 1, 1)
+
+            self.set_pin_positions_button = CreateButtonWithTip(
+                "Define Pin Positions",
+                "Select the location of each Pin's neck band (and for the 5-pin the head) in an image",
+                self.InitializePinSelectionWindow)
+            tab_layout.addLayout(self.set_pin_positions_button, 2, 0)
+            self.pin_coordinates = settings['Pin Scorer'].get('pin_coordinates')
+
         # Add a horizontal and vertical stretch to push items to the top-left in each tab
         tab_layout.setColumnStretch(4, 1)
         tab_layout.setRowStretch(tab_layout.rowCount(),1)
@@ -763,6 +895,11 @@ class SettingsTab(QWidget):
                 'thickness_curve': self.thickness_curve_item.value(),
                 'thickness_breakpoint': self.thickness_breakpoint_item.value(),
                 'thickness_arrow': self.thickness_arrow_item.value(),
+            },
+
+            'Pin Scorer': {
+                'time_pin_reading_after_start': self.time_pin_reading_after_start_item.value(),
+                'pin_coordinates': self.pin_coordinates
             }
         }
         self.settings_manager.SaveSettings(new_settings)
@@ -774,7 +911,7 @@ class SettingsTab(QWidget):
         self.settingsTabWidget.clear()
         # Reload settings into UI
         settings = self.settings_manager.GetSettings()
-        settings_categories = ["Lane Setup", "Recorder", "Ball Detection", "Calculations", "Video Export"]
+        settings_categories = ["Lane Setup", "Recorder", "Ball Detection", "Calculations", "Video Export", "Pin Scorer"]
         for setting in settings_categories:
             self.settingsTabWidget.addTab(self.SettingCategoriesTab(setting), setting)
 
@@ -814,6 +951,10 @@ class SettingsTab(QWidget):
                 QMessageBox.critical(None, "Could not read pins camera feed!",
                                      "Please make sure the pins camera for this lane is correctly selected and a resolution that is supported by the camera is entered.")
                 return False
+
+            # Flip the pins image if set
+            if settings['Recorder'].get('pins_flipped') == "Yes":
+                frame = cv2.flip(frame, -1)
 
         return frame
 
@@ -1036,3 +1177,15 @@ class SettingsTab(QWidget):
             cv2.imwrite(f'templates/arrows_template_lane_{self.lane_combobox.currentText()}.png', arrow_template)
 
         cv2.destroyWindow("Define Arrow Template")
+
+    def InitializePinSelectionWindow(self):
+        pin_frame = self.ReadCameraImage("Pins Camera")
+        self.pin_selection_window = PinSelectionWindow(pin_frame, self.lane_combobox.currentText())
+        self.pin_selection_window.pin_coordinates_signal.connect(self.ReceivePinCoordinates)
+        self.pin_selection_window.show()
+
+
+    def ReceivePinCoordinates(self, coordinates):
+        # Store the pin coordinates upon closing the PinSelectionWindow
+        self.pin_coordinates = coordinates
+        print(self.pin_coordinates)

@@ -7,6 +7,8 @@ import configparser
 import ast
 import shutil
 from ball_tracker import TrackVideo
+from scorer import PinScorer
+from signal_router import signal_router
 from PyQt5.QtCore import pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox
 
@@ -142,6 +144,11 @@ class RecorderWorker(QThread):
         self.detection_region = "start"
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
+        
+        # Initialize the BallTracker with a frame
+        ret, frame = self.cap.read()
+        self.ball_tracker = TrackVideo(frame, self.lane_number, frame)
+        self.ball_tracker.InitializeTracker()
 
         # Emit a signal to show that the recorder is idle and ready to record
         self.recorder_status.emit("idle")
@@ -212,21 +219,24 @@ class RecorderWorker(QThread):
 
                 # If not enough circles have been detected at the end of the lane, keep recording
                 elif self.detection_counter < self.detection_threshold and self.detection_region == "end":
-                    # Append the current frame to the export video buffer
-                    self.export_video_frame_buffer.append(frame)
+
+                    # Send the current frame to the ball tracker for tracking
+                    self.ball_tracker.TrackFrame(frame)
 
                 # If enough circles at the end of the lane have been detected, activate the cut trigger (run out period to record the pins camera) and keep recording
                 elif self.detection_counter >= self.detection_threshold and self.detection_region == "end":
                     cut_trigger = "active"
                     self.frames_after_shot -= 1
-                    # Append the current frame to the export video buffer
-                    self.export_video_frame_buffer.append(frame)
+                    self.current_pin_frame = 0
+
+                    # Send the current frame to the ball tracker for tracking
+                    self.ball_tracker.TrackFrame(frame)
 
             # If the cut trigger is active and there are still frames to be recorded, record them as well as the ones for the pin camera
             elif cut_trigger == "active" and self.frames_after_shot > -1:
 
-                # Append the current frame to the export video buffer
-                self.export_video_frame_buffer.append(frame)
+                # Send the current frame to the ball tracker for tracking
+                self.ball_tracker.TrackFrame(frame)
 
                 # Obtain the frame from the pins camera
                 ret_pins, frame_pins = self.cap_pins.read()
@@ -239,20 +249,31 @@ class RecorderWorker(QThread):
                 if self.pins_flipped == "Yes":
                     frame_pins_flipped = cv2.flip(frame_pins, -1)
                     self.out_pins.write(frame_pins_flipped)
+
+                    # Obtain the reference and reading frame for the pin scorer if conditions apply:
+                    if self.current_pin_frame == 0:
+                        self.pin_scorer_ref_frame = frame_pins_flipped
+                    elif self.current_pin_frame == self.config.getint('Pin Scorer', 'time_pin_reading_after_start'):
+                        self.pin_scorer_reading_frame = frame_pins_flipped
                 else:
                     self.out_pins.write(frame_pins)
+
+                    # Obtain the reference and reading frame for the pin scorer if conditions apply:
+                    if self.current_pin_frame == 0:
+                        self.pin_scorer_ref_frame = frame_pins
+                    elif self.current_pin_frame == self.config.getint('Pin Scorer', 'time_pin_reading_after_start'):
+                        self.pin_scorer_reading_frame = frame_pins
 
                 # If the last frame is reached, save the last frame from the pin camera as image
                 if self.frames_after_shot == 0:
                     # Emit a signal to show that the recorder is now saving the video files
                     self.recorder_status.emit("generating video")
 
-                    # Write the export video buffer to the file
-                    for current_frame in self.export_video_frame_buffer:
-                        self.out.write(current_frame)
-
                     # Write the last frame of the pins video as pin image to be statically displayed
                     cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins_flipped)
+
+
+                self.current_pin_frame += 1
                 self.frames_after_shot -= 1
 
             # If the last frame to be recorded is reached release both video files, then trigger the analysis and reset the variables for the next shot
@@ -266,8 +287,15 @@ class RecorderWorker(QThread):
 
                 # Emit a signal to show that the recorder is now tracking the shot
                 self.recorder_status.emit("tracking")
-                # Track the tracking camera video (incl. calculating values and saving the video)
-                TrackVideo(self.output_path, self.lane_number, self.reference_frame)
+
+                # Perform all calculations and visualizations on the tracked frames
+                self.ball_tracker.CalculateAndDraw()
+
+                # Trigger the Score Reader
+                self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
+                standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
+                
+                signal_router.pins_standing_signal.emit(standing_pins)
 
                 # Emit a signal to show that the recorder is now resetting itself for the next shot
                 self.recorder_status.emit("resetting")
@@ -286,6 +314,9 @@ class RecorderWorker(QThread):
                 self.pins_video_frame_buffer = deque(maxlen=self.frame_rate * self.export_video_buffer_length)
                 self.frames_after_shot = self.frames_after_shot_restore
                 self.lock_preshot_buffer = False
+
+                # Re-initialize the Ball Tracker
+                self.ball_tracker.InitializeTracker()
 
                 #  Re-initialize the VideoWriters to have them ready for recording the next shot
                 self.InitializeVideoWriters()

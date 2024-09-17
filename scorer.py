@@ -11,6 +11,8 @@ class PinScorer:
         for pin, coord in self.pin_coordinates.items():
             ref_pixel = self.reference_image[coord[1], coord[0]]
             current_pixel = current_image[coord[1], coord[0]]
+            ref_pixel = ref_pixel.astype(int)
+            current_pixel = current_pixel.astype(int)
 
             # Calculate the color difference
             diff = np.linalg.norm(ref_pixel - current_pixel)

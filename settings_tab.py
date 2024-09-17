@@ -110,6 +110,7 @@ class PinSelectionWindow(QWidget):
         # Define the variables used
         self.frame = frame
         self.selected_pin = None
+        self.color_labels = {}
 
         # Obtain the settings
         self.settings_manager = SettingsManager(defaults_path='defaults.cfg', settings_path=f'settings_lane_{lane_number}.cfg')
@@ -122,8 +123,8 @@ class PinSelectionWindow(QWidget):
             self.pin_coordinates = pin_coordinates_str
 
         # Calculate the scaling of the frame down to 600x400 pixel for display to set the correct coordinates
-        self.height_scalar = 400 / settings['Recorder'].get('pins_camera_x_resolution')
-        self.width_scalar = 600 / settings['Recorder'].get('pins_camera_y_resolution')
+        self.height_scalar = 400 / settings['Recorder'].get('pins_camera_y_resolution')
+        self.width_scalar = 600 / settings['Recorder'].get('pins_camera_x_resolution')
         print (self.height_scalar, self.width_scalar)
 
         self.initUI()
@@ -137,11 +138,30 @@ class PinSelectionWindow(QWidget):
         main_layout = QHBoxLayout(self)
 
         # Left side - Pin Buttons
-        button_layout = QVBoxLayout()
+        button_layout = QGridLayout()
+        pin_title = QLabel("Pin")
+        button_layout.addWidget(pin_title, 0, 1)
+
         for i in range(1, 11):
+            # Add buttons for all pins
             button = QPushButton(f"{i}", self)
             button.clicked.connect(self.PinButtonClicked)
-            button_layout.addWidget(button)
+            button_layout.addWidget(button, i, 1)
+
+            # Add the color of the pin selected
+            color_label = QLabel()
+            color_label.setFixedSize(32, 32)
+            color_label.setStyleSheet(f"background-color: rgb(255, 0, 0);")
+            button_layout.addWidget(color_label, i, 2)
+
+            # Store reference to color label for each pin
+            self.color_labels[str(i)] = color_label
+
+
+        # Middle - Pixel Color display
+        color_title = QLabel("Color selected")
+        button_layout.addWidget(color_title, 0, 2)
+        button_layout.setAlignment(Qt.AlignTop)
         main_layout.addLayout(button_layout)
 
         # Right side - Image Display
@@ -155,6 +175,8 @@ class PinSelectionWindow(QWidget):
         self.instructions_label.setText(
             "- Please select a pin on the left and then click the pin's neckband in the image.<br>"
             "- For the 5 pin, click on the pin's head as the neck band should not be visible.<br>"
+            "- On the left you will see the color of the selected pixel for each pin.<br>"
+            "  Please make sure it is significantly different from the background when the pin has fallen (white or read, not black).<br>"
             "- Simply close this window when all pins have been marked."
         )
         self.selected_pin_label = QLabel(self)
@@ -180,6 +202,13 @@ class PinSelectionWindow(QWidget):
             cv2.circle(resized_frame, (round(x * self.width_scalar), round(y * self.height_scalar)), 3, (255, 0, 0), -1)
             cv2.putText(resized_frame, str(pin_number), (round(x * self.width_scalar) - 3, round(y * self.height_scalar) - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 0, 0), 2)
+            # Obtain the pixel color of the pixel
+            pixel_color = self.frame[y, x]
+            r, g, b = pixel_color[2], pixel_color[1], pixel_color[0]
+
+		    # Update the QLabel color for the pin
+            self.color_labels[pin_number].setStyleSheet(f"background-color: rgb({r}, {g}, {b});")
+
 
         # Convert the resized image to QImage
         height, width, channel = resized_frame.shape
@@ -193,6 +222,7 @@ class PinSelectionWindow(QWidget):
         # Enable mouse click event on the image
         self.image_label.mousePressEvent = self.ImageClicked
 
+
     def PinButtonClicked(self):
         sender = self.sender()
         self.selected_pin = sender.text()
@@ -205,13 +235,15 @@ class PinSelectionWindow(QWidget):
             # Store the selected coordinate for the pin
             self.pin_coordinates[self.selected_pin] = (round(pos.x() / self.width_scalar), round(pos.y() / self.height_scalar))
             print(f"Pin {self.selected_pin} selected at {round(pos.x() / self.width_scalar)}, {round(pos.y() / self.height_scalar)}")
+
             self.DisplayPinFrame(self.empty_frame_copy)
         else:
             QMessageBox.warning(None, "No pin was selected.", "First select a pin on the left and subsequently click on the pins neck band in the image (or the pin head for the 5 pin)")
 
     def closeEvent(self, event):
         # Emit the signal with the pin coordinates when the window is closed
-        self.pin_coordinates_signal.emit(self.pin_coordinates)
+        print(self.pin_coordinates)
+        pin_coordinates_signal.emit(self.pin_coordinates)
         event.accept()  # Accept the event to close the window
 
 # Create a class, that displays a question mark besides the label and once clicked, displays a tool tip

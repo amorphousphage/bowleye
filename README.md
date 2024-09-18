@@ -1,5 +1,5 @@
 # BowlEye - Bowling Ball Tracker
-BowlEye is a camera based bowling ball tracking software which allows you to visualize the path of the bowling ball going down the lane and record a close-up video of the pin action
+BowlEye is a camera based bowling ball tracking software which allows you to visualize the path of the bowling ball going down the lane and record a close-up video of the pin action including reading the score
 
 ## Current Features
 This software automatically records a video when it detects a bowling ball going down the lane and analyses the video to show the following things:
@@ -14,7 +14,7 @@ This software operates in two modes:
 - Record Multiple Shots Mode: Every Shot is tracked and assigned to a selected player. All data points of all shots in the current game of a player a displayed inn a table and the mean and standard deviation values are calculated
 
 Videos can also be saved if wanted.
-Additionally, the software uses an additional camera to show a close-up of the pin action.
+Additionally, the software uses an additional camera to show a close-up of the pin action, which is then used to determine the pins left standing (reading the score)
 
 ## Features and improvements to come in the future
 - Revisiting recording of pin camera as it is too fast

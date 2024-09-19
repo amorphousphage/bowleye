@@ -75,6 +75,9 @@ class RecorderWorker(QThread):
         self.x_coordinate_threshold = self.config.getint('Ball Detection', 'max_horizontal_pixel_difference')
         self.detection_threshold = self.config.getint('Recorder', 'detection_threshold')
 
+        self.show_debugging_image = self.config.get('Ball Detection', 'show_debugging_image')
+        self.debugging_image_type = self.config.get('Ball Detection', 'debugging_image_type')
+
         return True
 
     # Function to initialize the Video Writer objects for both cameras
@@ -349,6 +352,16 @@ class RecorderWorker(QThread):
         # Calculate the difference to the reference frame and apply binary thresholding to it
         diff_frame = cv2.absdiff(blurred, reference_frame)
         _, binary = cv2.threshold(diff_frame, self.binary_threshold, self.binary_maximum, cv2.THRESH_BINARY)
+
+        if self.show_debugging_image == "Yes":
+            if self.debugging_image_type == "Binary":
+                # Show the binary image in a new window
+                cv2.imshow("Debugging - Binary Image", binary)
+            elif self.debugging_image_type == "Difference Only":
+                # Show the difference image in a new window
+                cv2.imshow("Debugging - Difference Only Image", diff_frame)
+
+            cv2.waitKey(10)  # Use a small delay to allow image to render
 
         # Try to find circles in the binary image
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

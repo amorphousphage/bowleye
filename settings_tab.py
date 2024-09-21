@@ -8,6 +8,7 @@ import cv2
 import ast
 import shutil
 import numpy as np
+from signal_router import signal_router
 
 # Create a class to handle settings storing, reading and reverting to defaults
 class SettingsManager:
@@ -243,7 +244,7 @@ class PinSelectionWindow(QWidget):
     def closeEvent(self, event):
         # Emit the signal with the pin coordinates when the window is closed
         print(self.pin_coordinates)
-        pin_coordinates_signal.emit(self.pin_coordinates)
+        self.pin_coordinates_signal.emit(self.pin_coordinates)
         event.accept()  # Accept the event to close the window
 
 # Create a class, that displays a question mark besides the label and once clicked, displays a tool tip

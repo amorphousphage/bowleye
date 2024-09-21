@@ -16,6 +16,10 @@ class PinScorer:
 
             # Calculate the color difference
             diff = np.linalg.norm(ref_pixel - current_pixel)
+            print(pin, ref_pixel, current_pixel, diff)
+            
+            cv2.imwrite("videos/01ref.png", self.reference_image)
+            cv2.imwrite("videos/02current.png", current_image)
 
             if diff > threshold:
                 standing_pins.remove(pin)

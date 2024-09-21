@@ -252,7 +252,7 @@ class RecorderWorker(QThread):
                 if self.pins_flipped == "Yes":
                     frame_pins_flipped = cv2.flip(frame_pins, -1)
                     self.out_pins.write(frame_pins_flipped)
-
+                    
                     # Obtain the reference and reading frame for the pin scorer if conditions apply:
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins_flipped
@@ -271,7 +271,7 @@ class RecorderWorker(QThread):
                 if self.frames_after_shot == 0:
                     # Emit a signal to show that the recorder is now saving the video files
                     self.recorder_status.emit("generating video")
-
+                    
                     # Write the last frame of the pins video as pin image to be statically displayed
                     cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins_flipped)
 
@@ -283,21 +283,20 @@ class RecorderWorker(QThread):
             elif cut_trigger == "active" and self.frames_after_shot <= -1:
                 # Release the Video Writers
                 self.ReleaseVideoWriters()
-
+                
                 # Copy the exported pins video from recordings folder to videos to not overwrite it with the re-inialization of the file at the end of the shot
                 self.output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
                 shutil.copy(self.output_path_pins, self.output_path_pins_saved)
-
+                
                 # Emit a signal to show that the recorder is now tracking the shot
                 self.recorder_status.emit("tracking")
-
+                
                 # Perform all calculations and visualizations on the tracked frames
                 self.ball_tracker.CalculateAndDraw()
 
                 # Trigger the Score Reader
                 self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
-                
                 signal_router.pins_standing_signal.emit(standing_pins)
 
                 # Emit a signal to show that the recorder is now resetting itself for the next shot

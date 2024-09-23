@@ -296,7 +296,12 @@ class RecorderWorker(QThread):
 
                 # Trigger the Score Reader
                 self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
+
+                # Test Pin Detection without Canny
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
+                # Test Pin Detection with Canny
+                #standing_pins = self.scorer.PinsStillStandingCanny(self.pin_scorer_reading_frame)
+
                 signal_router.pins_standing_signal.emit(standing_pins)
 
                 # Emit a signal to show that the recorder is now resetting itself for the next shot

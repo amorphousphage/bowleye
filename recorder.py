@@ -256,8 +256,10 @@ class RecorderWorker(QThread):
                     # Obtain the reference and reading frame for the pin scorer if conditions apply:
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins_flipped
+                        
                     elif self.current_pin_frame == self.config.getint('Pin Scorer', 'time_pin_reading_after_start'):
                         self.pin_scorer_reading_frame = frame_pins_flipped
+                        
                 else:
                     self.out_pins.write(frame_pins)
 
@@ -299,8 +301,6 @@ class RecorderWorker(QThread):
 
                 # Test Pin Detection without Canny
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
-                # Test Pin Detection with Canny
-                #standing_pins = self.scorer.PinsStillStandingCanny(self.pin_scorer_reading_frame)
 
                 signal_router.pins_standing_signal.emit(standing_pins)
 
@@ -365,7 +365,7 @@ class RecorderWorker(QThread):
                 # Show the difference image in a new window
                 cv2.imshow("Debugging - Difference Only Image", diff_frame)
 
-            cv2.waitKey(10)  # Use a small delay to allow image to render
+            cv2.waitKey(50)  # Use a small delay to allow image to render
 
         # Try to find circles in the binary image
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

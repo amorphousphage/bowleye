@@ -10,7 +10,7 @@ from ball_tracker import TrackVideo
 from scorer import PinScorer
 from signal_router import signal_router
 from PyQt5.QtCore import pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel
 
 # Generate a class for the recorder to run in a thread
 class RecorderWorker(QThread):
@@ -78,6 +78,12 @@ class RecorderWorker(QThread):
         self.show_debugging_image = self.config.get('Ball Detection', 'show_debugging_image')
         self.debugging_image_type = self.config.get('Ball Detection', 'debugging_image_type')
 
+        self.detection_bounds = np.array(ast.literal_eval(self.config.get('Lane Setup', 'detection_bounds')), dtype=np.int32)
+        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.config.get('Video Export', 'margins_video_export')
+        self.max_x_videoexport = self.detection_bounds[0][2][0] + self.config.get('Video Export', 'margins_video_export')
+
+        self.time_pin_reading_after_start = self.config.getint('Pin Scorer', 'time_pin_reading_after_start')
+
         return True
 
     # Function to initialize the Video Writer objects for both cameras
@@ -123,6 +129,49 @@ class RecorderWorker(QThread):
 
         return True
 
+    def RenderDebuggingFrame(self, frame, reference_frame_gray):
+
+        # Convert frame to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Extract region of interest (ROI) based on the defined detection bounds
+        roi = cv2.fillPoly(np.zeros_like(gray), self.detection_bounds, 255)
+
+        # Mask the grayscale frame with the ROI
+        roi_gray = cv2.bitwise_and(gray, gray, mask=roi)
+
+        # Mask the grayed reference with the ROI
+        reference_roi_gray = cv2.bitwise_and(reference_frame_gray, reference_frame_gray, mask=roi)
+
+        # Apply a blur to the grayscale frame to reduce noise
+        blurred = cv2.GaussianBlur(roi_gray, (self.ksize, self.ksize), self.sigma)
+
+        # Add Blur to the Reference ROI image to reduce noise
+        blurred_reference = cv2.GaussianBlur(reference_roi_gray, (self.ksize, self.ksize), self.sigma)
+
+        # Compute the absolute difference between the current frame and the reference frame within the ROI
+        diff_frame = cv2.absdiff(blurred, blurred_reference)
+
+        # Apply binary thresholding to segment the circle
+        _, binary = cv2.threshold(diff_frame, self.binary_threshold, self.binary_max, cv2.THRESH_BINARY)
+
+        # generate the pixmap for the debugging image
+        if self.debugging_image_type == "Binary":
+            binary = binary.astype(np.uint8)
+            height, width = binary.shape
+            q_image = QImage(binary.data, width, height, width, QImage.Format_Grayscale8)
+            self.debugging_pixmap = QPixmap.fromImage(q_image)
+
+        elif self.debugging_image_type == "Difference only":
+            diff_frame = diff_frame.astype(np.uint8)
+            height, width = diff_frame.shape
+            q_image = QImage(diff_frame.data, width, height, width, QImage.Format_Grayscale8)
+            self.debugging_pixmap = QPixmap.fromImage(q_image)
+
+        # Update the debugging image in the debugging window
+        if self.debugging_window and self.debugging_pixmap:
+            self.debugging_window.UpdateDebuggingImage(self.debugging_pixmap)
+
     # Function to execute once the recorder is called
     def run(self):
         # Obtain the settings
@@ -147,6 +196,23 @@ class RecorderWorker(QThread):
         self.detection_region = "start"
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
+
+        # Define the variable to hold the reference frame and the debugging frame
+        self.reference_frame = None
+        self.debugging_pixmap = None
+
+        # Define a variable to hold the debugging Window
+        self.debugging_window = None
+
+        if self.show_debugging_image:
+            # Generate a seperate Qt window to just display the debugging_image_item
+            if self.debugging_image_type == "Binary":
+                self.debugging_window = DebuggingWindow("Debugging Image - Binary")
+            elif self.debugging_image_type == "Difference only":
+                self.debugging_window = DebuggingWindow("Debugging Image - Difference image")
+            if self.debugging_window:
+                self.debugging_window.show()
+                self.debugging_window.raise_()
         
         # Initialize the BallTracker with a frame
         ret, frame = self.cap.read()
@@ -165,9 +231,15 @@ class RecorderWorker(QThread):
                 QMessageBox.critical(None, "Camera not readable", "Tracking Camera for lane " + str(
                 self.lane_number) + " could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
                 break
+
             # Check if the preshot buffer is not locked (ball was not yet detected and the buffer should still be overwritten), then append the frame
             if not self.lock_preshot_buffer:
                 self.preshot_video_frame_buffer.append(frame)
+
+            # Show the debugging image if enabled and if a reference_frame has been set
+            if self.show_debugging_image and self.reference_frame:
+                self.RenderDebuggingFrame(frame, self.reference_frame)
+                cv2waitKey(5)
 
             # Check if we are past the ball entering the pins (cut_trigger active)
             if cut_trigger == "inactive":
@@ -257,7 +329,7 @@ class RecorderWorker(QThread):
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins_flipped
                         
-                    elif self.current_pin_frame == self.config.getint('Pin Scorer', 'time_pin_reading_after_start'):
+                    elif self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins_flipped
                         
                 else:
@@ -266,7 +338,7 @@ class RecorderWorker(QThread):
                     # Obtain the reference and reading frame for the pin scorer if conditions apply:
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins
-                    elif self.current_pin_frame == self.config.getint('Pin Scorer', 'time_pin_reading_after_start'):
+                    elif self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins
 
                 # If the last frame is reached, save the last frame from the pin camera as image
@@ -357,16 +429,6 @@ class RecorderWorker(QThread):
         diff_frame = cv2.absdiff(blurred, reference_frame)
         _, binary = cv2.threshold(diff_frame, self.binary_threshold, self.binary_maximum, cv2.THRESH_BINARY)
 
-        if self.show_debugging_image == "Yes":
-            if self.debugging_image_type == "Binary":
-                # Show the binary image in a new window
-                cv2.imshow("Debugging - Binary Image", binary)
-            elif self.debugging_image_type == "Difference Only":
-                # Show the difference image in a new window
-                cv2.imshow("Debugging - Difference Only Image", diff_frame)
-
-            cv2.waitKey(50)  # Use a small delay to allow image to render
-
         # Try to find circles in the binary image
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -382,3 +444,21 @@ class RecorderWorker(QThread):
     # Function to stop the recorder loop
     def StopMonitoring(self):
         self.running = False
+
+        # Close the debugging window if it exists
+        if self.debugging_window:
+            self.debugging_window.close()
+
+class DebuggingWindow(QWidget):
+    def __init__(self, title="Debugging Window"):
+        super().__init__()
+        self.setWindowTitle(title)
+
+        # Create a layout and QLabel for displaying the image
+        self.layout = QVBoxLayout()
+        self.debugging_image_item = QLabel()
+        self.layout.addWidget(self.debugging_image_item)
+        self.setLayout(self.layout)
+
+    def UpdateDebuggingImage(self, pixmap):
+        self.debugging_image_item.setPixmap(pixmap)

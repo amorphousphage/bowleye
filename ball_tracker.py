@@ -66,8 +66,6 @@ class TrackVideo():
 
     # Function to detect the ball
     def DetectBall(self, frame, reference_frame):
-        # Define a global variable to hold the debugging image
-        global debug_frame
 
         # Convert frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

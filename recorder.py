@@ -328,6 +328,8 @@ class RecorderWorker(QThread):
                     # Obtain the reference and reading frame for the pin scorer if conditions apply:
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins_flipped
+                        # Write this first frame of the pins video as pin image to be statically displayed
+                        cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins_flipped)
                         
                     elif self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins_flipped
@@ -338,6 +340,9 @@ class RecorderWorker(QThread):
                     # Obtain the reference and reading frame for the pin scorer if conditions apply:
                     if self.current_pin_frame == 0:
                         self.pin_scorer_ref_frame = frame_pins
+                        # Write this first frame of the pins video as pin image to be statically displayed
+                        cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins)
+
                     elif self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins
 
@@ -345,10 +350,6 @@ class RecorderWorker(QThread):
                 if self.frames_after_shot == 0:
                     # Emit a signal to show that the recorder is now saving the video files
                     self.recorder_status.emit("generating video")
-                    
-                    # Write the last frame of the pins video as pin image to be statically displayed
-                    cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins_flipped)
-
 
                 self.current_pin_frame += 1
                 self.frames_after_shot -= 1
@@ -371,7 +372,7 @@ class RecorderWorker(QThread):
                 # Trigger the Score Reader
                 self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
 
-                # Test Pin Detection without Canny
+                # Read the Score Reader
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
 
                 signal_router.pins_standing_signal.emit(standing_pins)
@@ -393,6 +394,11 @@ class RecorderWorker(QThread):
                 self.pins_video_frame_buffer = deque(maxlen=self.frame_rate * self.export_video_buffer_length)
                 self.frames_after_shot = self.frames_after_shot_restore
                 self.lock_preshot_buffer = False
+                frame = None
+                frame_pins = None
+
+                if self.pins_flipped == "Yes":
+                    frame_pins_flipped = None
 
                 # Re-initialize the Ball Tracker
                 self.ball_tracker.InitializeTracker()

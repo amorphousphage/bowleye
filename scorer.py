@@ -13,9 +13,8 @@ class PinScorer:
 
             # Define a region around the pin
             region_size = 20
-            
-            cv2.imwrite("videos/01ref.png", self.reference_image)
-            cv2.imwrite("videos/02read.png", read_image)
+
+            cv2.imwrite("videos/01read.png", read_image)
             
             ref_region = self.reference_image[y-region_size:y+region_size, x-region_size:x+region_size]
             read_region = read_image[y-region_size:y+region_size, x-region_size:x+region_size]

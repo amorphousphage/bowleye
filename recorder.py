@@ -11,6 +11,7 @@ from scorer import PinScorer
 from signal_router import signal_router
 from PyQt5.QtCore import pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel
+from PyQt5.QtGui import QPixmap, QImage
 
 # Generate a class for the recorder to run in a thread
 class RecorderWorker(QThread):
@@ -75,14 +76,15 @@ class RecorderWorker(QThread):
         self.x_coordinate_threshold = self.config.getint('Ball Detection', 'max_horizontal_pixel_difference')
         self.detection_threshold = self.config.getint('Recorder', 'detection_threshold')
 
-        self.show_debugging_image = self.config.get('Ball Detection', 'show_debugging_image')
-        self.debugging_image_type = self.config.get('Ball Detection', 'debugging_image_type')
-
-        self.detection_bounds = np.array(ast.literal_eval(self.config.get('Lane Setup', 'detection_bounds')), dtype=np.int32)
-        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.config.get('Video Export', 'margins_video_export')
-        self.max_x_videoexport = self.detection_bounds[0][2][0] + self.config.get('Video Export', 'margins_video_export')
-
-        self.time_pin_reading_after_start = self.config.getint('Pin Scorer', 'time_pin_reading_after_start')
+        self.show_debugging_image = config.get('Ball Detection', 'show_debugging_image')
+        self.debugging_image_type = config.get('Ball Detection', 'debugging_image_type')
+        
+        self.detection_bounds = np.array(ast.literal_eval(config.get('Lane Setup', 'detection_bounds')), dtype=np.int32)
+        
+        self.min_x_videoexport = self.detection_bounds[0][3][0] - config.getint('Video Export', 'margins_video_export')
+        self.max_x_videoexport = self.detection_bounds[0][2][0] + config.getint('Video Export', 'margins_video_export')
+        
+        self.time_pin_reading_after_start = config.getint('Pin Scorer', 'time_pin_reading_after_start')
 
         return True
 
@@ -129,14 +131,15 @@ class RecorderWorker(QThread):
 
         return True
 
-    def RenderDebuggingFrame(self, frame, reference_frame_gray):
-
+    def RenderDebuggingFrame(self, frame, reference_frame):
+        
         # Convert frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
+        
+        reference_frame_gray = cv2.cvtColor(reference_frame, cv2.COLOR_BGR2GRAY)
         # Extract region of interest (ROI) based on the defined detection bounds
         roi = cv2.fillPoly(np.zeros_like(gray), self.detection_bounds, 255)
-
+        
         # Mask the grayscale frame with the ROI
         roi_gray = cv2.bitwise_and(gray, gray, mask=roi)
 
@@ -151,13 +154,13 @@ class RecorderWorker(QThread):
 
         # Compute the absolute difference between the current frame and the reference frame within the ROI
         diff_frame = cv2.absdiff(blurred, blurred_reference)
-
+        
         # Apply binary thresholding to segment the circle
-        _, binary = cv2.threshold(diff_frame, self.binary_threshold, self.binary_max, cv2.THRESH_BINARY)
-
+        _, binary = cv2.threshold(diff_frame, self.binary_threshold, self.binary_maximum, cv2.THRESH_BINARY)
+        
         # generate the pixmap for the debugging image
         if self.debugging_image_type == "Binary":
-            binary = binary.astype(np.uint8)
+            #binary = binary.astype(np.uint8)
             height, width = binary.shape
             q_image = QImage(binary.data, width, height, width, QImage.Format_Grayscale8)
             self.debugging_pixmap = QPixmap.fromImage(q_image)
@@ -174,6 +177,7 @@ class RecorderWorker(QThread):
 
     # Function to execute once the recorder is called
     def run(self):
+        
         # Obtain the settings
         if not self.InitializeSettings():
             self.finished.emit()
@@ -188,7 +192,7 @@ class RecorderWorker(QThread):
         if not self.InitializeVideoWriters():
             self.finished.emit()
             return
-
+            
         # Set control variables for triggering and performing the recording/analysis
         centerlist = []
         self.frames_without_detection = 0
@@ -196,15 +200,15 @@ class RecorderWorker(QThread):
         self.detection_region = "start"
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
-
+        
         # Define the variable to hold the reference frame and the debugging frame
         self.reference_frame = None
         self.debugging_pixmap = None
-
+        
         # Define a variable to hold the debugging Window
         self.debugging_window = None
-
-        if self.show_debugging_image:
+        
+        if self.show_debugging_image == "Yes":
             # Generate a seperate Qt window to just display the debugging_image_item
             if self.debugging_image_type == "Binary":
                 self.debugging_window = DebuggingWindow("Debugging Image - Binary")
@@ -235,12 +239,12 @@ class RecorderWorker(QThread):
             # Check if the preshot buffer is not locked (ball was not yet detected and the buffer should still be overwritten), then append the frame
             if not self.lock_preshot_buffer:
                 self.preshot_video_frame_buffer.append(frame)
-
+            
             # Show the debugging image if enabled and if a reference_frame has been set
-            if self.show_debugging_image and self.reference_frame:
+            if self.show_debugging_image == "Yes" and self.reference_frame is not None:
                 self.RenderDebuggingFrame(frame, self.reference_frame)
-                cv2waitKey(5)
-
+                cv2.waitKey(5)
+               
             # Check if we are past the ball entering the pins (cut_trigger active)
             if cut_trigger == "inactive":
 
@@ -465,6 +469,8 @@ class DebuggingWindow(QWidget):
         self.debugging_image_item = QLabel()
         self.layout.addWidget(self.debugging_image_item)
         self.setLayout(self.layout)
+        
+        self.setFixedSize(1800,1000)
 
     def UpdateDebuggingImage(self, pixmap):
         self.debugging_image_item.setPixmap(pixmap)

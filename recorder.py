@@ -278,6 +278,22 @@ class RecorderWorker(QThread):
                     # Emit a signal to show that the recorder is now recording
                     self.recorder_status.emit("recording")
 
+                    # Obtain the frame from the pins camera to define the reference frame for pin score reading
+                    ret_pins, frame_pins = self.cap_pins.read()
+                    if not ret_pins:
+                        QMessageBox.critical(None, "Camera not readable", "Pins Camera for lane " + str(self.lane_number) + " could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
+                    break
+
+                    # Flip the frame if defined so in settings (camera is mounted upside down) and read the reference frame for pin score reading
+                    if self.pins_flipped == "Yes":
+                        frame_pins_flipped = cv2.flip(frame_pins, -1)
+                        self.pin_scorer_ref_frame = frame_pins_flipped
+                    else:
+                        self.pin_scorer_ref_frame = frame_pins
+
+                    # Write this first frame of the pins video as pin image to be statically displayed
+                    cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', self.pin_scorer_ref_frame)
+
                 # If not enough circles have been detected at the end of the lane, keep recording
                 elif self.detection_counter < self.detection_threshold and self.detection_region == "end":
 
@@ -310,26 +326,14 @@ class RecorderWorker(QThread):
                 if self.pins_flipped == "Yes":
                     frame_pins_flipped = cv2.flip(frame_pins, -1)
                     self.out_pins.write(frame_pins_flipped)
-                    
-                    # Obtain the reference and reading frame for the pin scorer if conditions apply:
-                    if self.current_pin_frame == 0:
-                        self.pin_scorer_ref_frame = frame_pins_flipped
-                        # Write this first frame of the pins video as pin image to be statically displayed
-                        cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins_flipped)
                         
-                    elif self.current_pin_frame == self.time_pin_reading_after_start:
+                    if self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins_flipped
                         
                 else:
                     self.out_pins.write(frame_pins)
 
-                    # Obtain the reference and reading frame for the pin scorer if conditions apply:
-                    if self.current_pin_frame == 0:
-                        self.pin_scorer_ref_frame = frame_pins
-                        # Write this first frame of the pins video as pin image to be statically displayed
-                        cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', frame_pins)
-
-                    elif self.current_pin_frame == self.time_pin_reading_after_start:
+                    if self.current_pin_frame == self.time_pin_reading_after_start:
                         self.pin_scorer_reading_frame = frame_pins
 
                 # If the last frame is reached, save the last frame from the pin camera as image

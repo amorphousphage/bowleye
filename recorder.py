@@ -9,8 +9,8 @@ import shutil
 from ball_tracker import TrackVideo
 from scorer import PinScorer
 from signal_router import signal_router
-from PyQt5.QtCore import pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QThread, QObject
+from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel, QApplication
 from PyQt5.QtGui import QPixmap, QImage
 
 # Generate a class for the recorder to run in a thread
@@ -160,37 +160,34 @@ class RecorderWorker(QThread):
         
         # generate the pixmap for the debugging image
         if self.debugging_image_type == "Binary":
-            #binary = binary.astype(np.uint8)
+            binary = np.ascontiguousarray(binary[:, self.min_x_videoexport:self.max_x_videoexport])
             height, width = binary.shape
             q_image = QImage(binary.data, width, height, width, QImage.Format_Grayscale8)
-            self.debugging_pixmap = QPixmap.fromImage(q_image)
-
+            signal_router.debugging_image.emit(q_image)
+            
         elif self.debugging_image_type == "Difference only":
-            diff_frame = diff_frame.astype(np.uint8)
+            diff_frame = np.ascontiguousarray(diff_frame[:, self.min_x_videoexport:self.max_x_videoexport])
             height, width = diff_frame.shape
             q_image = QImage(diff_frame.data, width, height, width, QImage.Format_Grayscale8)
-            self.debugging_pixmap = QPixmap.fromImage(q_image)
-
-        # Update the debugging image in the debugging window
-        if self.debugging_window and self.debugging_pixmap:
-            self.debugging_window.UpdateDebuggingImage(self.debugging_pixmap)
+            signal_router.debugging_image.emit(q_image)
+   
 
     # Function to execute once the recorder is called
     def run(self):
         
         # Obtain the settings
         if not self.InitializeSettings():
-            self.finished.emit()
+            signal_router.finished.emit()
             return
 
         # Initialize the cameras
         if not self.InitializeCameras():
-            self.finished.emit()
+            signal_router.finished.emit()
             return
 
         # Initialize the Video Writers
         if not self.InitializeVideoWriters():
-            self.finished.emit()
+            signal_router.finished.emit()
             return
             
         # Set control variables for triggering and performing the recording/analysis
@@ -203,20 +200,6 @@ class RecorderWorker(QThread):
         
         # Define the variable to hold the reference frame and the debugging frame
         self.reference_frame = None
-        self.debugging_pixmap = None
-        
-        # Define a variable to hold the debugging Window
-        self.debugging_window = None
-        
-        if self.show_debugging_image == "Yes":
-            # Generate a seperate Qt window to just display the debugging_image_item
-            if self.debugging_image_type == "Binary":
-                self.debugging_window = DebuggingWindow("Debugging Image - Binary")
-            elif self.debugging_image_type == "Difference only":
-                self.debugging_window = DebuggingWindow("Debugging Image - Difference image")
-            if self.debugging_window:
-                self.debugging_window.show()
-                self.debugging_window.raise_()
         
         # Initialize the BallTracker with a frame
         ret, frame = self.cap.read()
@@ -243,7 +226,6 @@ class RecorderWorker(QThread):
             # Show the debugging image if enabled and if a reference_frame has been set
             if self.show_debugging_image == "Yes" and self.reference_frame is not None:
                 self.RenderDebuggingFrame(frame, self.reference_frame)
-                cv2.waitKey(5)
                
             # Check if we are past the ball entering the pins (cut_trigger active)
             if cut_trigger == "inactive":
@@ -454,23 +436,3 @@ class RecorderWorker(QThread):
     # Function to stop the recorder loop
     def StopMonitoring(self):
         self.running = False
-
-        # Close the debugging window if it exists
-        if self.debugging_window:
-            self.debugging_window.close()
-
-class DebuggingWindow(QWidget):
-    def __init__(self, title="Debugging Window"):
-        super().__init__()
-        self.setWindowTitle(title)
-
-        # Create a layout and QLabel for displaying the image
-        self.layout = QVBoxLayout()
-        self.debugging_image_item = QLabel()
-        self.layout.addWidget(self.debugging_image_item)
-        self.setLayout(self.layout)
-        
-        self.setFixedSize(1800,1000)
-
-    def UpdateDebuggingImage(self, pixmap):
-        self.debugging_image_item.setPixmap(pixmap)

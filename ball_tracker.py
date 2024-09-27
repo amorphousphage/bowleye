@@ -43,6 +43,7 @@ class TrackVideo():
         if arrows_template is None:
             QMessageBox.critical(None, "No Arrow Template found!",
                                  "The arrow template is not avaialbe. Please select an arrow template in the settings. Tracker can not successfully continue")
+            signal_router.finished.emit()
             exit()
 
         # Extract region of interest (ROI) based on the defined detection bounds
@@ -253,9 +254,8 @@ class TrackVideo():
             self.min_y_arrows = min(arrow[1] for arrow in self.arrow_positions)
 
         else:
-            print("No arrows detected")
-            #QMessageBox.critical(None, "Arrows could not be detected!",
-            #                     "There was an error detecting arrows. The tracker will exit.")
+            QMessageBox.critical(None, "Arrows could not be detected!",
+                                 "There was an error detecting arrows. The tracker will exit.")
             exit()
 
         # Calculate the mean vertical coordinate to calculate the reference line for the position of the arrows

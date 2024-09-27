@@ -3,11 +3,13 @@ import os
 import datetime
 import shutil
 import configparser
+import numpy as np
+import cv2
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, QTabWidget, QRadioButton, QButtonGroup, QGroupBox, QPushButton, QSpinBox, QLineEdit, QLabel, QDesktopWidget, QStyle, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QGridLayout, QSpacerItem, QMessageBox, QSizePolicy
 from PyQt5.QtCore import Qt, QUrl, QThread, pyqtSlot, QTimer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtGui import QPixmap, QFont, QMovie
+from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage
 from pyqt_switch import PyQtSwitch
 from tracking_data_updater import TrackingDataUpdater
 from recorder import RecorderWorker
@@ -168,6 +170,9 @@ class LaneTab(QWidget):
         self.recorder_layout.addWidget(self.recorder_status_label)
         self.recorder_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         self.col2_layout.addLayout(self.recorder_layout)
+        
+        # If the recorder fails to start stop it
+        signal_router.finished.connect(self.StopRecorder)
 
         # Initially set the recording flag to inactive
         self.recording_active = False
@@ -392,7 +397,27 @@ class LaneTab(QWidget):
         # Play the contents with some time delay
         signal_router.tracking_unsuccessful.connect(lambda: self.PlayContent("pins", 2000))
 
+        # Connect the signal for the debugging image to a function displaying it
+        signal_router.debugging_image.connect(self.ShowDebuggingImage)
 
+    def ShowDebuggingImage(self, image):
+        # Convert QImage to a format suitable for OpenCV
+        image = image.convertToFormat(QImage.Format_Grayscale8)  # Ensure it's in grayscale format
+        width = image.width()
+        height = image.height()
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        image_array = np.array(ptr).reshape(height, width)  # Convert QImage to NumPy array
+        
+        # Resize the image to 70% of its original size
+        new_width = int(width * 0.7)
+        new_height = int(height * 0.7)
+        resized_image = cv2.resize(image_array, (new_width, new_height))
+
+        # Show the binary image using OpenCV
+        cv2.imshow("Debugging Image", resized_image)
+        cv2.waitKey(1)
+                
     # Function to update the visibility of the player fields and the table as well as the overlay checkbox
     def updateFieldVisibility(self):
         # When the Record Mode Button is checked, display the player controls and the overlay checkbox
@@ -838,6 +863,7 @@ class LaneTab(QWidget):
         else:
             self.StopRecorder()
 
+
     # Function to update the Recording label to let the user know what the recorder is doing at the moment
     @pyqtSlot(str)
     def UpdateRecorderStatus(self, status):
@@ -895,6 +921,7 @@ class LaneTab(QWidget):
             self.recorder_worker.wait()
             self.recorder_worker = None
             self.recording_active = False
+            cv2.destroyAllWindows()
 
     # Function to Disconnect the Signals and turn off the recorder when the program is closed
     def DisconnectSignalsAndStopRecorder(self):

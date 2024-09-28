@@ -401,7 +401,7 @@ class LaneTab(QWidget):
         signal_router.debugging_image.connect(lambda: self.ShowDebuggingImage("tracking"))
         signal_router.debugging_image_pins.connect(lambda: self.ShowDebuggingImage("pins"))
 
-    def ShowDebuggingImage(self, image):
+    def ShowDebuggingImage(self, image, source):
         # Convert QImage to a format suitable for OpenCV
         image = image.convertToFormat(QImage.Format_Grayscale8)  # Ensure it's in grayscale format
         width = image.width()

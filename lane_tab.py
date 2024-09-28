@@ -398,7 +398,8 @@ class LaneTab(QWidget):
         signal_router.tracking_unsuccessful.connect(lambda: self.PlayContent("pins", 2000))
 
         # Connect the signal for the debugging image to a function displaying it
-        signal_router.debugging_image.connect(self.ShowDebuggingImage)
+        signal_router.debugging_image.connect(lambda: self.ShowDebuggingImage("tracking"))
+        signal_router.debugging_image_pins.connect(lambda: self.ShowDebuggingImage("pins"))
 
     def ShowDebuggingImage(self, image):
         # Convert QImage to a format suitable for OpenCV
@@ -409,13 +410,18 @@ class LaneTab(QWidget):
         ptr.setsize(image.byteCount())
         image_array = np.array(ptr).reshape(height, width)  # Convert QImage to NumPy array
         
-        # Resize the image to 70% of its original size
-        new_width = int(width * 0.7)
-        new_height = int(height * 0.7)
+        # Resize the image to 60% of its original size
+        new_width = int(width * 0.6)
+        new_height = int(height * 0.6)
         resized_image = cv2.resize(image_array, (new_width, new_height))
 
         # Show the binary image using OpenCV
-        cv2.imshow("Debugging Image", resized_image)
+        if source == "tracking":
+            cv2.imshow("Debugging Image - Tracking", resized_image)
+
+        elif source == "pins":
+            cv2.imshow("Debugging Image - Pins", resized_image)
+
         cv2.waitKey(1)
                 
     # Function to update the visibility of the player fields and the table as well as the overlay checkbox
@@ -878,7 +884,7 @@ class LaneTab(QWidget):
             self.recorder_status_label.setStyleSheet("color: orange;")
 
         if status == "tracking":
-            self.recorder_status_label.setText("Calculating Track and Values...")
+            self.recorder_status_label.setText("Calculating Ball Track, Values and Reading Pin Score...")
             self.recorder_status_label.setStyleSheet("color: blue;")
 
         if status == "resetting":

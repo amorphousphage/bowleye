@@ -849,14 +849,14 @@ class SettingsTab(QWidget):
         # Set the GUI elements for the tab "Pin Scorer"
         elif setting == "Pin Scorer":
 
-            self.time_pin_reading_after_start_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
-                                                                        "Select how many frames should be recorded since the pin camera started before the score should be read")
-            self.time_pin_reading_after_start_item = QSpinBox()
-            self.time_pin_reading_after_start_item.setMinimum(10)
-            self.time_pin_reading_after_start_item.setMaximum(200)
-            self.time_pin_reading_after_start_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_start'))
-            tab_layout.addLayout(self.time_pin_reading_after_start_label, 1, 0)
-            tab_layout.addWidget(self.time_pin_reading_after_start_item, 1, 1)
+            self.time_pin_reading_after_sweeper_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
+                                                                        "Select how many frames should be recorded since the sweeper came down before the score should be read")
+            self.time_pin_reading_after_sweeper_item = QSpinBox()
+            self.time_pin_reading_after_sweeper_item.setMinimum(10)
+            self.time_pin_reading_after_sweeper_item.setMaximum(200)
+            self.time_pin_reading_after_sweeper_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_sweeper'))
+            tab_layout.addLayout(self.time_pin_reading_after_sweeper_label, 1, 0)
+            tab_layout.addWidget(self.time_pin_reading_after_sweeper_item, 1, 1)
 
             self.set_pin_positions_button = CreateButtonWithTip(
                 "Define Pin Positions",
@@ -931,7 +931,7 @@ class SettingsTab(QWidget):
             },
 
             'Pin Scorer': {
-                'time_pin_reading_after_start': self.time_pin_reading_after_start_item.value(),
+                'time_pin_reading_after_sweeper': self.time_pin_reading_after_sweeper_item.value(),
                 'pin_coordinates': self.pin_coordinates
             }
         }

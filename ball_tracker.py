@@ -66,27 +66,7 @@ class TrackVideo():
         return self.arrow_positions, arrows_template
 
     # Function to detect the ball
-    def DetectBall(self, frame, reference_frame):
-
-        # Convert frame to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Extract region of interest (ROI) based on the defined detection bounds
-        roi = cv2.fillPoly(np.zeros_like(gray), self.detection_bounds, 255)
-
-        # Mask the grayscale frame with the ROI
-        roi_gray = cv2.bitwise_and(gray, gray, mask=roi)
-
-        # Apply a blur to the grayscale frame to reduce noise
-        blurred = cv2.GaussianBlur(roi_gray, (self.settings['blurred_kernel'], self.settings['blurred_kernel']),
-                                   self.settings['blurred_sigma'])
-
-        # Compute the absolute difference between the current frame and the reference frame within the ROI
-        diff_frame = cv2.absdiff(blurred, reference_frame)
-
-        # Apply binary thresholding to segment the circle
-        _, binary = cv2.threshold(diff_frame, self.settings['binary_threshold'], self.settings['binary_max'],
-                                  cv2.THRESH_BINARY)
+    def DetectBall(self, binary):
 
         # Find contours in the binary mask
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -120,7 +100,7 @@ class TrackVideo():
                 # Add the validated center coordinates to a list containing all identified valid center points across frames
                 self.centerlist.append(center_bottom)
 
-        # show any image used in calculation of circles rather than showing the true video image (for debugging purposes)
+        # generate any image used in calculation of circles rather than showing the true video image (for debugging purposes)
         if self.settings['show_debug_image']:
 
             # show the binary image if set in the settings
@@ -302,12 +282,12 @@ class TrackVideo():
         # Define a variable to hold the last frame
         self.last_frame = None
 
-    def TrackFrame(self, frame):
+    def TrackFrame(self, binary, frame):
         # Store the last frame for later recall showing the values (before drawing all centers on the frame, because they should not show in last_frame)
         self.last_frame = frame.copy()
 
         # Detect the ball
-        self.DetectBall(frame, self.blurred_reference)
+        self.DetectBall(binary)
 
         # Write the debugging frame if enabled
         if self.settings['show_debug_image']:

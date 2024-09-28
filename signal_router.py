@@ -9,6 +9,7 @@ class SignalRouter(QObject):
     pins_standing_signal = pyqtSignal(list)
     finished = pyqtSignal()
     debugging_image = pyqtSignal(QImage)
+    debugging_image_pins = pyqtSignal(QImage)
 
 # Create a global instance of SignalRouter
 signal_router = SignalRouter()

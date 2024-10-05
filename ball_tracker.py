@@ -67,14 +67,12 @@ class TrackVideo():
 
     # Function to detect the ball
     def DetectBall(self, binary):
-
         # Find contours in the binary mask
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
         # Calculate maximum y-axis starting coordinate from the detection_bounds (y-axis coordinate of the roi closes to the foul line)
         starting_y_coordinate = max(
             point[1] for detection_bound in self.detection_bounds for point in detection_bound)
-
+        
         # Loop over the contours
         for contour in contours:
             # Find the center and radius of the enclosing circle for the contour
@@ -95,11 +93,10 @@ class TrackVideo():
                     'x_coordinate_threshold'] < center_bottom[0] < self.centerlist[-1][0] +
                     self.settings['x_coordinate_threshold'])):
                 # Draw the circle and its center bottom on the original image
-                cv2.circle(frame, center, int(radius), (0, 255, 0), 2)
-
+                cv2.circle(self.frame, center, int(radius), (0, 255, 0), 2)
                 # Add the validated center coordinates to a list containing all identified valid center points across frames
                 self.centerlist.append(center_bottom)
-
+        
         # generate any image used in calculation of circles rather than showing the true video image (for debugging purposes)
         if self.settings['show_debug_image']:
 
@@ -113,12 +110,11 @@ class TrackVideo():
 
             # Else show the normal image
             else:
-                self.debug_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
+                self.debug_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Else define the normal image as debug image
         else:
-            self.debug_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
-
+            self.debug_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
         # Return the list of detected circles and the debug_frame
         return self.centerlist, self.debug_frame
 
@@ -284,18 +280,19 @@ class TrackVideo():
 
     def TrackFrame(self, binary, frame):
         # Store the last frame for later recall showing the values (before drawing all centers on the frame, because they should not show in last_frame)
-        self.last_frame = frame.copy()
-
+        self.frame = frame
+        self.last_frame = self.frame.copy()
+        self.binary = binary
+        
         # Detect the ball
-        self.DetectBall(binary)
-
+        self.DetectBall(self.binary)
         # Write the debugging frame if enabled
         if self.settings['show_debug_image']:
             # Convert the grayscale debug_frame to a three channel color frame and write it to the video
             self.debug_out.write(cv2.cvtColor(self.debug_frame, cv2.COLOR_GRAY2BGR))
 
         # Crop the frame for export
-        cropped_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
+        cropped_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Write the frame to the video
         self.out.write(cropped_frame)

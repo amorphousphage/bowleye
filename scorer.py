@@ -28,7 +28,6 @@ class PinScorer:
 
             # Calculate color difference
             diff = np.linalg.norm(ref_pixel_mean - read_pixel_mean)
-            print(pin, ref_pixel_mean, read_pixel_mean, diff)
 
             if diff > threshold:
                 standing_pins.remove(pin)

@@ -293,7 +293,7 @@ class RecorderWorker(QThread):
 
                 # Generate the binary difference image from the current ball tracking frame to it's reference (called in recording mode so the masking is done to either start or end detection bounds)
                 binary_image = self.RenderDifferenceImage(frame, self.reference_frame, "ball tracking", "recording")
-
+                
                 # Detect circles in the current frame
                 centerlist = self.DetectCircles(binary_image, centerlist)
 
@@ -325,27 +325,29 @@ class RecorderWorker(QThread):
                     ret_pins, frame_pins = self.cap_pins.read()
                     if not ret_pins:
                         QMessageBox.critical(None, "Camera not readable", "Pins Camera for lane " + str(self.lane_number) + " could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
-                    break
-
+                        break
+                    
                     # Flip the frame if defined so in settings (camera is mounted upside down) and read the reference frame for pin score reading
                     if self.pins_flipped == "Yes":
                         frame_pins_flipped = cv2.flip(frame_pins, -1)
                         self.pin_scorer_ref_frame = frame_pins_flipped
                     else:
                         self.pin_scorer_ref_frame = frame_pins
-
+                    
                     # Write this first frame of the pins video as pin image to be statically displayed
                     cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', self.pin_scorer_ref_frame)
-
+                    
                 # If not enough circles have been detected at the end of the lane, keep recording
                 elif self.detection_counter < self.detection_threshold and self.detection_region == "end":
-
+                    
                     # Generate the difference image to send to the tracker
                     binary_image = self.RenderDifferenceImage(frame, self.reference_frame, "ball tracking", "tracking")
-
+                    #cv2.imshow("Debugging", binary_image)
+                    #cv2.waitKey(0)
+                    
                     # Send the current frame to the ball tracker for tracking
                     self.ball_tracker.TrackFrame(binary_image, frame)
-
+                    
                 # If enough circles at the end of the lane have been detected, activate the cut trigger (run out period to record the pins camera) and keep recording
                 elif self.detection_counter >= self.detection_threshold and self.detection_region == "end":
                     cut_trigger = "active"
@@ -360,13 +362,12 @@ class RecorderWorker(QThread):
 
             # If the cut trigger is active and there are still frames to be recorded, record them as well as the ones for the pin camera
             elif cut_trigger == "active" and self.frames_after_shot > -1:
-
                 # Generate the difference image to send to the tracker
                 binary_image = self.RenderDifferenceImage(frame, self.reference_frame, "ball tracking", "tracking")
 
                 # Send the current frame to the ball tracker for tracking
                 self.ball_tracker.TrackFrame(binary_image, frame)
-
+                
                 # Obtain the frame from the pins camera
                 ret_pins, frame_pins = self.cap_pins.read()
                 if not ret_pins:
@@ -384,10 +385,10 @@ class RecorderWorker(QThread):
                     # Show the debugging image if enabled and if a reference_frame has been set
                     if self.show_debugging_image == "Yes" and self.pin_scorer_ref_frame is not None:
                         self.RenderDifferenceImage(frame_pins_flipped, self.pin_scorer_ref_frame, "pins", "debugging")
-
+                    
                     if self.sweeper_detected == False:
                         # Generate binary difference image of the pins frame
-                        binary_image_pins = self.RenderDifferenceImage(pins_frame_flipped, self.pin_scorer_ref_frame,"pins", "tracking")
+                        binary_image_pins = self.RenderDifferenceImage(frame_pins_flipped, self.pin_scorer_ref_frame,"pins", "tracking")
                         
                     # If time after sweeper detection has been reached, capture the read frame for the pins scoring
                     if self.frame_after_sweeper_detection == self.time_pin_reading_after_sweeper:
@@ -403,7 +404,7 @@ class RecorderWorker(QThread):
 
                     if self.sweeper_detected == False:
                         # Generate binary difference image of the pins frame
-                        binary_image_pins = self.RenderDifferenceImage(pins_frame, self.pin_scorer_ref_frame,"pins", "tracking")
+                        binary_image_pins = self.RenderDifferenceImage(frame_pins, self.pin_scorer_ref_frame,"pins", "tracking")
 
                     # If time after sweeper detection has been reached, capture the read frame for the pins scoring
                     if self.frame_after_sweeper_detection == self.time_pin_reading_after_sweeper:
@@ -412,7 +413,7 @@ class RecorderWorker(QThread):
                 # Check the binary pins image for the sweeper (all white pixels for an entire row) if it was not detected yet. otherwise increase the frame after sweeper detection
                 if self.sweeper_detected == False:
                     self.DetectSweeper(binary_image_pins)
-
+                    
                 else:
                     self.frame_after_sweeper_detection += 1
 

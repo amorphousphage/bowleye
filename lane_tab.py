@@ -5,6 +5,7 @@ import shutil
 import configparser
 import numpy as np
 import cv2
+from functools import partial
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, QTabWidget, QRadioButton, QButtonGroup, QGroupBox, QPushButton, QSpinBox, QLineEdit, QLabel, QDesktopWidget, QStyle, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QGridLayout, QSpacerItem, QMessageBox, QSizePolicy
 from PyQt5.QtCore import Qt, QUrl, QThread, pyqtSlot, QTimer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
@@ -398,10 +399,10 @@ class LaneTab(QWidget):
         signal_router.tracking_unsuccessful.connect(lambda: self.PlayContent("pins", 2000))
 
         # Connect the signal for the debugging image to a function displaying it
-        signal_router.debugging_image.connect(lambda: self.ShowDebuggingImage("tracking"))
-        signal_router.debugging_image_pins.connect(lambda: self.ShowDebuggingImage("pins"))
+        signal_router.debugging_image.connect(partial(self.ShowDebuggingImage, "tracking"))
+        signal_router.debugging_image_pins.connect(partial(self.ShowDebuggingImage, "pins"))
 
-    def ShowDebuggingImage(self, image, source):
+    def ShowDebuggingImage(self, source, image):
         # Convert QImage to a format suitable for OpenCV
         image = image.convertToFormat(QImage.Format_Grayscale8)  # Ensure it's in grayscale format
         width = image.width()

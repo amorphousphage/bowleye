@@ -998,9 +998,9 @@ class SettingsTab(QWidget):
         frame = self.ReadCameraImage(camera)
 
         # Display the frame in a window
-        cv2.namedWindow("Testing " + camera, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Testing " + camera, 1800, 900)
         cv2.imshow("Testing " + camera, frame)
+        cv2.resizeWindow("Testing " + camera, 1800, 900)
+        cv2.waitKey(1)
 
 
     # Function to define detection boundaries by drawing a trapezoid on the first frame
@@ -1194,8 +1194,9 @@ class SettingsTab(QWidget):
 
         # Create a window and set mouse callback function
         cv2.namedWindow("Define Arrow Template", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Define Arrow Template", 1800, 900)
         cv2.imshow("Define Arrow Template", frame_copy)
+        cv2.resizeWindow("Define Arrow Template", 1800, 900)
+        cv2.waitKey(1)
         cv2.setMouseCallback("Define Arrow Template", MouseCallback)
 
         # Wait until the window is closed by the user

@@ -420,8 +420,10 @@ class LaneTab(QWidget):
         if source == "tracking":
             cv2.imshow("Debugging Image - Tracking", resized_image)
 
+
         elif source == "pins":
             cv2.imshow("Debugging Image - Pins", resized_image)
+            cv2.resizeWindow("Debugging Image - Pins", 800, 600)
 
         cv2.waitKey(1)
                 

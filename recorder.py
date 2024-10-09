@@ -6,6 +6,7 @@ import cv2
 import configparser
 import ast
 import shutil
+import time
 from ball_tracker import TrackVideo
 from scorer import PinScorer
 from signal_router import signal_router
@@ -253,6 +254,14 @@ class RecorderWorker(QThread):
         self.sweeper_detected = False
         self.sweeper_count = 0
 
+        # Define the variables holding the frame from the tracking camera as well from the pins camera
+        frame = None
+        frame_pins = None
+
+        # Define the variables to hold the pins reference and reading frame for score reading
+        self.pin_scorer_ref_frame = None
+        self.pin_scorer_reading_frame = None
+
         # Initialize the BallTracker with a frame
         ret, frame = self.cap.read()
         self.ball_tracker = TrackVideo(frame, self.lane_number, frame)
@@ -261,8 +270,20 @@ class RecorderWorker(QThread):
         # Emit a signal to show that the recorder is idle and ready to record
         self.recorder_status.emit("idle")
 
+        # Define a variable to hold the time when the while loop starts and a list to store all times elapsed for the while loop
+        start_time = None
+        time_elapsed_list = []
         # Define a loop that runs, while the recorder is active
         while self.running:
+            if start_time is not None:
+                # Calculate the time elapsed for the previous run of the while loop
+                time_elapsed = time.time() - start_time
+
+                # Add this duration to the list
+                time_elapsed_list.append(time_elapsed)
+
+            # Set the start time to measure how long the while loop takes to run
+            start_time = time.time()
 
             # Try to read the current camera image
             ret, frame = self.cap.read()
@@ -342,8 +363,6 @@ class RecorderWorker(QThread):
                     
                     # Generate the difference image to send to the tracker
                     binary_image = self.RenderDifferenceImage(frame, self.reference_frame, "ball tracking", "tracking")
-                    #cv2.imshow("Debugging", binary_image)
-                    #cv2.waitKey(0)
                     
                     # Send the current frame to the ball tracker for tracking
                     self.ball_tracker.TrackFrame(binary_image, frame)
@@ -476,6 +495,10 @@ class RecorderWorker(QThread):
                 self.frames_after_sweeper_detection = 0
                 self.sweeper_detected = False
                 self.sweeper_count = 0
+                self.pin_scorer_ref_frame = None
+                self.pin_scorer_reading_frame = None
+                frame = None
+                frame_pins = None
 
                 # Re-initialize the Ball Tracker
                 self.ball_tracker.InitializeTracker()
@@ -485,6 +508,16 @@ class RecorderWorker(QThread):
 
                 # Emit a signal to show that the recorder is idle and ready to record
                 self.recorder_status.emit("idle")
+
+                # Calculate the average time it took for the while loop to run and reset the timer
+
+                average_time_elapsed = sum(time_elapsed_list) / len(time_elapsed_list)
+                print(f"Time for loop: {time_elapsed_list}")
+                print(f"Average time for loop: {average_time_elapsed:.4f} seconds")
+                print(f"Average fps: {int(1 / average_time_elapsed)}")
+
+                start_time = None
+                time_elapsed_list = []
 
         # Release the cameras after the recorder is stopped
         self.cap.release()

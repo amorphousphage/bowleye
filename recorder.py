@@ -344,6 +344,7 @@ class RecorderWorker(QThread):
 
                     # Obtain the frame from the pins camera to define the reference frame for pin score reading
                     ret_pins, frame_pins = self.cap_pins.read()
+                    print("now")
                     if not ret_pins:
                         QMessageBox.critical(None, "Camera not readable", "Pins Camera for lane " + str(self.lane_number) + " could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
                         break
@@ -512,7 +513,6 @@ class RecorderWorker(QThread):
                 # Calculate the average time it took for the while loop to run and reset the timer
 
                 average_time_elapsed = sum(time_elapsed_list) / len(time_elapsed_list)
-                print(f"Time for loop: {time_elapsed_list}")
                 print(f"Average time for loop: {average_time_elapsed:.4f} seconds")
                 print(f"Average fps: {int(1 / average_time_elapsed)}")
 

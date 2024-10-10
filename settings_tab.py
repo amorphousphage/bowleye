@@ -681,14 +681,14 @@ class SettingsTab(QWidget):
             self.debug_image_title = QLabel("<b>Debugging Image</b>")
             tab_layout.addWidget(self.debug_image_title, 13, 0)
 
-            self.toggle_debugging_image_label = CreateLabelWithTip("Save Debugging Image Video", "Save a debugging video showing the images, which the program uses for Ball detection")
+            self.toggle_debugging_image_label = CreateLabelWithTip("Show and Save Debugging Image Video", "Show a live view of and save a debugging video showing the images, which the program uses for Ball detection")
             self.toggle_debugging_image_item = QComboBox()
             self.toggle_debugging_image_item.addItems(["Yes", "No"])
             self.toggle_debugging_image_item.setCurrentText(str(settings['Ball Detection'].get('show_debugging_image')))
             tab_layout.addLayout(self.toggle_debugging_image_label, 14, 0)
             tab_layout.addWidget(self.toggle_debugging_image_item, 14, 1)
 
-            self.change_debugging_image_label = CreateLabelWithTip("Set Debugging Image Type", "Choose between the Image Showing the Difference to the Reference or the processed binary image")
+            self.change_debugging_image_label = CreateLabelWithTip("Set Debugging Image Type", "Choose between the Image Showing the Difference to the Reference or the processed binary image (for live view only)")
             self.change_debugging_image_item = QComboBox()
             self.change_debugging_image_item.addItems(["Binary", "Difference only"])
             self.change_debugging_image_item.setCurrentText(str(settings['Ball Detection'].get('debugging_image_type')))

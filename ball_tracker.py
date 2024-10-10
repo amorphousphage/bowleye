@@ -99,22 +99,12 @@ class TrackVideo():
         
         # generate any image used in calculation of circles rather than showing the true video image (for debugging purposes)
         if self.settings['show_debug_image']:
-
-            # show the binary image if set in the settings
-            if self.settings['debugging_image_type'] == "Binary":
                 self.debug_frame = binary[:, self.min_x_videoexport:self.max_x_videoexport]
-
-            # show the difference image if set in settings
-            elif self.settings['debugging_image_type'] == "Difference only":
-                self.debug_frame = diff_frame[:, self.min_x_videoexport:self.max_x_videoexport]
-
-            # Else show the normal image
-            else:
-                self.debug_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Else define the normal image as debug image
         else:
             self.debug_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
+            
         # Return the list of detected circles and the debug_frame
         return self.centerlist, self.debug_frame
 

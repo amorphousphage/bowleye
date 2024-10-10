@@ -13,7 +13,7 @@ from signal_router import signal_router
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QThread, QObject
 from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel, QApplication
 from PyQt5.QtGui import QPixmap, QImage
-from threading import Lock
+from threading import Lock, Event
 
 # Generate a class for the recorder to run in a thread
 class RecorderWorker(QThread):
@@ -129,10 +129,14 @@ class RecorderWorker(QThread):
         self.cap_pins.set(cv2.CAP_PROP_FPS, self.frame_rate_pins)
         self.cap_pins.set(cv2.CAP_PROP_FRAME_WIDTH, self.pins_camera_width)
         self.cap_pins.set(cv2.CAP_PROP_FRAME_HEIGHT, self.pins_camera_height)
+        
+        # Set events to signal once the cameras have shut down when stopping the recorder to trigger release of the captures
+        self.tracking_frame_stopped_event = Event()
+        self.pins_frame_stopped_event = Event()
 
         # Create worker threads for both cameras
-        self.tracking_camera_worker = FrameCaptureWorker(self.cap, is_pins_camera=False)
-        self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, is_pins_camera=True, flip_frame=(self.pins_flipped == "Yes"))
+        self.tracking_camera_worker = FrameCaptureWorker(self.cap, self.tracking_frame_stopped_event, is_pins_camera=False)
+        self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, self.pins_frame_stopped_event, is_pins_camera=True, flip_frame=(self.pins_flipped == "Yes"))
 
         # Connect the signals to the appropriate slots
         self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame)
@@ -142,16 +146,25 @@ class RecorderWorker(QThread):
 
     # Function to process tracking camera frames
     def ProcessTrackingCameraFrame(self, frame):
-        with self.tracking_frame_lock:
-            # Store or process the frame as needed in your recorder worker
-            self.tracking_camera_frame = frame
+        if self.tracking_camera_frame is None:
+            with self.tracking_frame_lock:
+                self.tracking_camera_frame = frame
+            # Set the event to signalize the first frame has been captured
+            self.tracking_frame_ready_event.set()
+        else:
+            with self.tracking_frame_lock:
+                self.tracking_camera_frame = frame
 
     # Function to process pins camera frames
     def ProcessPinsCameraFrame(self, frame_pins):
-        with self.pins_frame_lock:
-            # Store or process the pins frame as needed in your recorder worker
-            self.pins_camera_frame = frame_pins
-
+        if self.pins_camera_frame is None:
+            with self.pins_frame_lock:
+                self.pins_camera_frame = frame_pins
+            # Set the event to signalize the first frame has been captured
+            self.pins_frame_ready_event.set()
+        else:
+            with self.pins_frame_lock:
+                self.pins_camera_frame = frame_pins
 
     def RenderDifferenceImage(self, frame, reference_frame, source, mode):
         # Convert frame to grayscale
@@ -265,7 +278,11 @@ class RecorderWorker(QThread):
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
         
-        # Define the variable to hold the reference frame and the debugging frame
+        # Define the variables holding the frames read from the cameras
+        self.tracking_camera_frame = None
+        self.pins_camera_frame = None
+        
+        # Define the variable to hold the reference frame
         self.reference_frame = None
 
         # Define the variables used for sweeper detection
@@ -281,11 +298,19 @@ class RecorderWorker(QThread):
         # Set the locks for the tracking and pin camera such that not more than one thread can access the shared variable at once
         self.tracking_frame_lock = Lock()
         self.pins_frame_lock = Lock()
-
+        
+        # Set events to signal once the cameras have been started and a frame has been read after intialization
+        self.tracking_frame_ready_event = Event()
+        self.pins_frame_ready_event = Event()
+        
         # Start the camera workers
         self.tracking_camera_worker.start()
         self.pins_camera_worker.start()
-
+        
+        # Wait for both cameras to be ready and have their first frame captured
+        self.tracking_frame_ready_event.wait()
+        self.pins_frame_ready_event.wait()
+        
         # Initialize the BallTracker with a frame
         with self.tracking_frame_lock:
             frame = self.tracking_camera_frame
@@ -511,19 +536,23 @@ class RecorderWorker(QThread):
 
                 start_time = None
                 time_elapsed_list = []
-
+        
         # Stop the camera workers
         self.tracking_camera_worker.stop()
         self.pins_camera_worker.stop()
-
+        
+        # Wait for the camera workers to stop
+        self.tracking_frame_stopped_event.wait()
+        self.pins_frame_stopped_event.wait()
+        
         # Release the cameras after the recorder is stopped
         self.cap.release()
         self.cap_pins.release()
-
+        
         # Wait for threads to finish
         self.tracking_camera_worker.wait()
         self.pins_camera_worker.wait()
-
+        
         # Emit a signal to show that the recorder has been turned off
         self.recorder_status.emit("recorder offline")
 
@@ -584,9 +613,10 @@ class FrameCaptureWorker(QThread):
     tracking_frame_captured = pyqtSignal(object)
     pins_frame_captured = pyqtSignal(object)
 
-    def __init__(self, camera, is_pins_camera=False, flip_frame=False):
+    def __init__(self, camera, stop_event, is_pins_camera=False, flip_frame=False):
         super().__init__()
         self.camera = camera
+        self.stop_event = stop_event
         self.is_pins_camera = is_pins_camera
         self.flip_frame = flip_frame
         self.running = True
@@ -611,6 +641,9 @@ class FrameCaptureWorker(QThread):
 
             else:
                 self.tracking_frame_captured.emit(frame)
+        
+        # Set the event to signal successful stopping of the camera readings
+        self.stop_event.set()
 
     def stop(self):
         self.running = False

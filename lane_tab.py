@@ -886,7 +886,7 @@ class LaneTab(QWidget):
             self.recorder_status_label.setText("Saving Videos...")
             self.recorder_status_label.setStyleSheet("color: orange;")
 
-        if status == "tracking":
+        if status == "calculating":
             self.recorder_status_label.setText("Calculating Ball Track, Values and Reading Pin Score...")
             self.recorder_status_label.setStyleSheet("color: blue;")
 

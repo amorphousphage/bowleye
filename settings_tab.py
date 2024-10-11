@@ -852,8 +852,8 @@ class SettingsTab(QWidget):
             self.time_pin_reading_after_sweeper_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
                                                                         "Select how many frames should be recorded since the sweeper came down before the score should be read")
             self.time_pin_reading_after_sweeper_item = QSpinBox()
-            self.time_pin_reading_after_sweeper_item.setMinimum(10)
-            self.time_pin_reading_after_sweeper_item.setMaximum(200)
+            self.time_pin_reading_after_sweeper_item.setMinimum(2)
+            self.time_pin_reading_after_sweeper_item.setMaximum(50)
             self.time_pin_reading_after_sweeper_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_sweeper'))
             tab_layout.addLayout(self.time_pin_reading_after_sweeper_label, 1, 0)
             tab_layout.addWidget(self.time_pin_reading_after_sweeper_item, 1, 1)

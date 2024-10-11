@@ -19,6 +19,8 @@ from threading import Lock, Event
 class RecorderWorker(QThread):
     # Define a signal to pass the status of the recorder to the lane tab for the user to see
     recorder_status = pyqtSignal(str)
+    start_pins_buffering = pyqtSignal()
+    stop_pins_buffering = pyqtSignal()
 
     def __init__(self, lane_number):
         super().__init__()
@@ -141,6 +143,10 @@ class RecorderWorker(QThread):
         # Connect the signals to the appropriate slots
         self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame)
         self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame)
+        self.pins_camera_worker.buffer_ready.connect(self.ReceivePinsBuffer)
+
+        self.start_pins_buffering.connect(self.pins_camera_worker.StartBuffering)
+        self.stop_pins_buffering.connect(self.pins_camera_worker.StopBuffering)
 
         return True
 
@@ -252,6 +258,21 @@ class RecorderWorker(QThread):
             elif source == "pins":
                 signal_router.debugging_image_pins.emit(q_image)
 
+    def ReceivePinsBuffer(self, buffer):
+
+        self.pins_video_frame_buffer = buffer
+
+        # Process and save the frames in the buffer to the pins video file
+        for frame in self.pins_video_frame_buffer:
+            self.out_pins.write(frame)
+
+        # Release the Video Writers
+        self.ReleaseVideoWriters()
+
+        # Copy the exported pins video from recordings folder to videos to not overwrite it with the re-inialization of the file at the end of the shot
+        self.output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
+        shutil.copy(self.output_path_pins, self.output_path_pins_saved)
+
     # Function to execute once the recorder is called
     def run(self):
         
@@ -277,6 +298,7 @@ class RecorderWorker(QThread):
         self.detection_region = "start"
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
+        self.started_pins_buffering = False
         
         # Define the variables holding the frames read from the cameras
         self.tracking_camera_frame = None
@@ -420,6 +442,10 @@ class RecorderWorker(QThread):
 
             # If the cut trigger is active and there are still frames to be recorded, record them as well as the ones for the pin camera
             elif cut_trigger == "active" and self.frames_after_shot > -1:
+                if not self.started_pins_buffering:
+                    self.start_pins_buffering.emit()
+                    self.started_pins_buffering = True
+
                 # Generate the difference image to send to the tracker
                 with self.tracking_frame_lock:
                     frame = self.tracking_camera_frame
@@ -431,11 +457,14 @@ class RecorderWorker(QThread):
                 # Append the current pins camera image to the pins video buffer
                 with self.pins_frame_lock:
                     pins_frame = self.pins_camera_frame
-                self.pins_video_frame_buffer.append(pins_frame)
 
                 # Show the debugging image if enabled and if a reference_frame has been set
                 if self.show_debugging_image == "Yes" and self.pin_scorer_ref_frame is not None:
                     self.RenderDifferenceImage(pins_frame, self.pin_scorer_ref_frame, "pins", "debugging")
+
+                if self.sweeper_detected == True:
+                    # Increase the frame count after sweeper detection by one
+                    self.frame_after_sweeper_detection += 1
 
                 if self.sweeper_detected == False and self.pin_scorer_ref_frame is not None:
                     # Generate binary difference image of the pins frame
@@ -443,10 +472,6 @@ class RecorderWorker(QThread):
 
                     # Try to detect the sweeper in the binary image (a row of all white pixels)
                     self.DetectSweeper(binary_image_pins)
-
-                if self.sweeper_detected == True:
-                    # Increase the frame count after sweeper detection by one
-                    self.frame_after_sweeper_detection += 1
 
                 # If time after sweeper detection has been reached, capture the read frame for the pins scoring
                 if self.frame_after_sweeper_detection == self.time_pin_reading_after_sweeper:
@@ -468,17 +493,9 @@ class RecorderWorker(QThread):
 
             # If the last frame to be recorded is reached, write the pin video and release both video files, then trigger the analysis and reset the variables for the next shot
             elif cut_trigger == "active" and self.frames_after_shot <= -1:
-
-                # Write pin video buffer to the video file
-                for pin_frame in self.pins_video_frame_buffer:
-                    self.out_pins.write(pin_frame)
-
-                # Release the Video Writers
-                self.ReleaseVideoWriters()
-                
-                # Copy the exported pins video from recordings folder to videos to not overwrite it with the re-inialization of the file at the end of the shot
-                self.output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
-                shutil.copy(self.output_path_pins, self.output_path_pins_saved)
+                if self.started_pins_buffering:
+                    self.stop_pins_buffering.emit()
+                    self.started_pins_buffering = False
 
                 # Write pin score reading reference frame as pin image to be statically displayed
                 cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', self.pin_scorer_ref_frame)
@@ -612,6 +629,7 @@ class FrameCaptureWorker(QThread):
     # Define signals to send the captured frame to the recorder worker
     tracking_frame_captured = pyqtSignal(object)
     pins_frame_captured = pyqtSignal(object)
+    buffer_ready = pyqtSignal(list)
 
     def __init__(self, camera, stop_event, is_pins_camera=False, flip_frame=False):
         super().__init__()
@@ -620,6 +638,18 @@ class FrameCaptureWorker(QThread):
         self.is_pins_camera = is_pins_camera
         self.flip_frame = flip_frame
         self.running = True
+        self.buffer = []
+        self.buffering = False
+
+    def StartBuffering(self):
+        # Start Buffering and reset the buffer
+        self.buffering = True
+        self.buffer = []
+
+    def StopBuffering(self):
+        # Stop buffering and emit the buffer to the RecorderWorker
+        self.buffering = False
+        self.buffer_ready.emit(self.buffer)
 
     def run(self):
         while self.running:
@@ -639,9 +669,12 @@ class FrameCaptureWorker(QThread):
 
                 self.pins_frame_captured.emit(frame)
 
+                if self.buffering:
+                    self.buffer.append(frame)
+
             else:
                 self.tracking_frame_captured.emit(frame)
-        
+
         # Set the event to signal successful stopping of the camera readings
         self.stop_event.set()
 

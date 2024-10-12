@@ -139,15 +139,15 @@ class RecorderWorker(QThread):
         # Create worker threads for both cameras
         self.tracking_camera_worker = FrameCaptureWorker(self.cap, self.tracking_frame_stopped_event, is_pins_camera=False)
         self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, self.pins_frame_stopped_event, is_pins_camera=True, flip_frame=(self.pins_flipped == "Yes"))
-
+        
         # Connect the signals to the appropriate slots
         self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame)
         self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame)
         self.pins_camera_worker.buffer_ready.connect(self.ReceivePinsBuffer)
-
+        
         self.start_pins_buffering.connect(self.pins_camera_worker.StartBuffering)
         self.stop_pins_buffering.connect(self.pins_camera_worker.StopBuffering)
-
+        
         return True
 
     # Function to process tracking camera frames
@@ -338,7 +338,7 @@ class RecorderWorker(QThread):
             frame = self.tracking_camera_frame
         self.ball_tracker = TrackVideo(frame, self.lane_number, frame)
         self.ball_tracker.InitializeTracker()
-
+        
         # Emit a signal to show that the recorder is idle and ready to record
         self.recorder_status.emit("idle")
 
@@ -645,16 +645,32 @@ class FrameCaptureWorker(QThread):
         # Start Buffering and reset the buffer
         self.buffering = True
         self.buffer = []
+        print("started pin buffering")
 
     def StopBuffering(self):
         # Stop buffering and emit the buffer to the RecorderWorker
         self.buffering = False
         self.buffer_ready.emit(self.buffer)
+        print("stopped pin buffering")
 
     def run(self):
+        time_elapsed_pins_list = []
+        start_time_pins = None
+        
         while self.running:
+            if start_time_pins is not None and self.is_pins_camera:
+                # Calculate the time elapsed for the previous run of the while loop
+                time_elapsed_pins = time.time() - start_time_pins
+
+                # Add this duration to the list
+                time_elapsed_pins_list.append(time_elapsed_pins)
+
+            if self.is_pins_camera:
+                # Set the start time to measure how long the while loop takes to run
+                start_time_pins = time.time()
+            
             ret, frame = self.camera.read()
-            if not ret and not is_pins_camera:
+            if not ret and not self.is_pins_camera:
                 QMessageBox.critical(None, "Camera not readable", "Tracking Camera for this lane could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
                 break
             elif not ret and is_pins_camera:
@@ -671,6 +687,8 @@ class FrameCaptureWorker(QThread):
 
                 if self.buffering:
                     self.buffer.append(frame)
+                    if len(time_elapsed_pins_list) > 0:
+                        print("Average Pin Coverage FPS:", 1 / sum(time_elapsed_pins_list) / len(time_elapsed_pins_list))
 
             else:
                 self.tracking_frame_captured.emit(frame)

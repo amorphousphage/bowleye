@@ -999,7 +999,6 @@ class SettingsTab(QWidget):
 
         # Display the frame in a window
         cv2.imshow("Testing " + camera, frame)
-        cv2.resizeWindow("Testing " + camera, 1800, 900)
         cv2.waitKey(1)
 
 

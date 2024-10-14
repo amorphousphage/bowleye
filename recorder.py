@@ -261,7 +261,6 @@ class RecorderWorker(QThread):
     def ReceivePinsBuffer(self, buffer):
 
         self.pins_video_frame_buffer = buffer
-
         # Process and save the frames in the buffer to the pins video file
         for frame in self.pins_video_frame_buffer:
             self.out_pins.write(frame)
@@ -549,7 +548,7 @@ class RecorderWorker(QThread):
 
                 # Calculate the average time it took for the while loop to run and reset the timer
                 average_time_elapsed = sum(time_elapsed_list) / len(time_elapsed_list)
-                print(f"Average fps: {int(1 / average_time_elapsed)}")
+                print(f"Average while loop FPS: {int(1 / average_time_elapsed)}")
 
                 start_time = None
                 time_elapsed_list = []
@@ -645,13 +644,14 @@ class FrameCaptureWorker(QThread):
         # Start Buffering and reset the buffer
         self.buffering = True
         self.buffer = []
-        print("started pin buffering")
+        self.start_time_buffer = time.time()
 
     def StopBuffering(self):
         # Stop buffering and emit the buffer to the RecorderWorker
         self.buffering = False
         self.buffer_ready.emit(self.buffer)
-        print("stopped pin buffering")
+        print(time.time() - self.start_time_buffer)
+        self.start_time_buffer = None
 
     def run(self):
         time_elapsed_pins_list = []
@@ -668,7 +668,7 @@ class FrameCaptureWorker(QThread):
             if self.is_pins_camera:
                 # Set the start time to measure how long the while loop takes to run
                 start_time_pins = time.time()
-            
+
             ret, frame = self.camera.read()
             if not ret and not self.is_pins_camera:
                 QMessageBox.critical(None, "Camera not readable", "Tracking Camera for this lane could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
@@ -688,7 +688,7 @@ class FrameCaptureWorker(QThread):
                 if self.buffering:
                     self.buffer.append(frame)
                     if len(time_elapsed_pins_list) > 0:
-                        print("Average Pin Coverage FPS:", 1 / sum(time_elapsed_pins_list) / len(time_elapsed_pins_list))
+                        print("Average Pin Coverage FPS:", int(1 / (sum(time_elapsed_pins_list) / len(time_elapsed_pins_list))))
 
             else:
                 self.tracking_frame_captured.emit(frame)

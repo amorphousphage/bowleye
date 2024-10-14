@@ -10,6 +10,8 @@ class SignalRouter(QObject):
     finished = pyqtSignal()
     debugging_image = pyqtSignal(QImage)
     debugging_image_pins = pyqtSignal(QImage)
+    
+    finalized_tracked_frame = pyqtSignal(object)
 
 # Create a global instance of SignalRouter
 signal_router = SignalRouter()

@@ -13,9 +13,11 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from collections import deque
 from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtCore import pyqtSignal
 from signal_router import signal_router
 
 class TrackVideo():
+    
     def __init__(self, frame, lane_number, reference_frame):
         super().__init__()
 
@@ -234,20 +236,6 @@ class TrackVideo():
         #Initialize the point_closest_to_gutter for the breakpoint calculation and storage
         self.point_closest_to_gutter = None
 
-        # Define the bounds for the video export format
-        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.settings['margins_video_export']
-        self.max_x_videoexport = self.detection_bounds[0][2][0] + self.settings['margins_video_export']
-
-        # Get video properties (for video export)
-        self.frame_width = int(self.max_x_videoexport - self.min_x_videoexport)
-        self.frame_height = int(self.frame.shape[0])
-        self.fps = self.settings['tracking_camera_fps']
-
-        # Define the codec and create VideoWriter object
-        self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.output_video_path = "videos/current_tracking_video_lane_" + str(self.lane_number) + ".mp4"
-        self.out = cv2.VideoWriter(self.output_video_path, self.fourcc, self.fps, (self.frame_width, self.frame_height))
-
         # Define the VideoWriter for the debugging video if necessary
         if self.settings['show_debug_image']:
             self.output_debug_video_path = "videos/debug_new_lane_" + str(self.lane_number) + ".mp4"
@@ -285,7 +273,7 @@ class TrackVideo():
         cropped_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Write the frame to the video
-        self.out.write(cropped_frame)
+        signal_router.finalized_tracked_frame.emit(cropped_frame)
 
         # Check for how many consecutive frames no center (circle) was detected and if a new one was detected, reset the counter
         if len(self.centerlist) == self.centerlist_length:
@@ -526,13 +514,8 @@ class TrackVideo():
         # Write the static image as the last frame with calculated values
         cv2.imwrite('videos/tracked_new_' + str(self.lane_number) + '.png', cropped_last_frame)
 
-        # Write the last frame multiple times for 0.3 seconds at the end of the video
-        for _ in range(round(self.fps * 0.3)):
-            self.out.write(cropped_last_frame)
-
-        # Release the video writer
-        self.out.release()
-        shutil.copy(self.output_video_path, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
+        # Send the last frame to be written at the end of the video
+        signal_router.finalized_tracked_frame.emit(cropped_last_frame)
 
         if self.settings['show_debug_image']:
             self.debug_out.release()

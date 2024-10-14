@@ -180,7 +180,6 @@ class TrackVideo():
             'y_coordinate_threshold' : self.config.getint('Ball Detection','max_vertical_pixel_difference'),
             'x_coordinate_threshold' : self.config.getint('Ball Detection','max_horizontal_pixel_difference'),
             'visualize_minmax_arrow' : self.config.getboolean('Calculations', 'visualize_minmax_arrow'),
-            'tracking_camera_fps' : self.config.getint('Recorder','recorder_frame_rate')
         }
 
         #########################

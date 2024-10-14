@@ -527,51 +527,34 @@ class SettingsTab(QWidget):
             tab_layout.addLayout(self.pins_flipped_label, 6, 0)
             tab_layout.addWidget(self.pins_flipped_item, 6, 1)
 
-
-            self.recorder_frame_rate_label = CreateLabelWithTip("Tracking Camera Frame Rate", "Set the frame rate with which the recorder should check for the ball detection")
-            tab_layout.addLayout(self.recorder_frame_rate_label, 7, 0)
-            self.recorder_frame_rate_item = QSpinBox()
-            self.recorder_frame_rate_item.setMinimum(5)
-            self.recorder_frame_rate_item.setMaximum(60)
-            self.recorder_frame_rate_item.setValue(settings['Recorder'].get('recorder_frame_rate'))
-            tab_layout.addWidget(self.recorder_frame_rate_item, 7, 1)
-
-            self.pins_frame_rate_label = CreateLabelWithTip("Pin Camera Frame Rate", "Set the frame rate with which the recorder should run the camera in front of the pins")
-            tab_layout.addLayout(self.pins_frame_rate_label, 8, 0)
-            self.pins_frame_rate_item = QSpinBox()
-            self.pins_frame_rate_item.setMinimum(10)
-            self.pins_frame_rate_item.setMaximum(60)
-            self.pins_frame_rate_item.setValue(settings['Recorder'].get('pins_frame_rate'))
-            tab_layout.addWidget(self.pins_frame_rate_item, 8, 1)
-
-            tab_layout.addItem(QSpacerItem(spacer_distance, spacer_distance), 9, 1)
+            tab_layout.addItem(QSpacerItem(spacer_distance, spacer_distance), 7, 1)
 
             self.recorder_settings_title = QLabel("<b> Recorder Software settings </b>")
-            tab_layout.addWidget(self.recorder_settings_title, 10, 0)
+            tab_layout.addWidget(self.recorder_settings_title, 8, 0)
 
             self.recorder_detection_bounds_start_button = CreateButtonWithTip("Select Detection Bounds to Start Recording", "Draw the area where the software should detect the ball to start the recording", lambda: self.DefineBounds("recorder_start_bounds"))
             self.recorder_start_bounds_str = settings['Recorder'].get('recorder_start_bounds')
-            tab_layout.addLayout(self.recorder_detection_bounds_start_button, 11, 0)
+            tab_layout.addLayout(self.recorder_detection_bounds_start_button, 9, 0)
 
             self.recorder_detection_bounds_end_button = CreateButtonWithTip("Select Detection Bounds to End Recording", "Draw the area where the software should detect the ball to trigger the finalizing of the recording", lambda: self.DefineBounds("recorder_end_bounds"))
             self.recorder_end_bounds_str = settings['Recorder'].get('recorder_end_bounds')
-            tab_layout.addLayout(self.recorder_detection_bounds_end_button, 12, 0)
+            tab_layout.addLayout(self.recorder_detection_bounds_end_button, 10, 0)
 
             self.export_video_buffer_label = CreateLabelWithTip("Export Video Buffer", "Set the max amount of seconds of exported to a video. This is the maximal length of an exported video")
             self.export_video_buffer_item = QSpinBox()
             self.export_video_buffer_item.setMinimum(5)
             self.export_video_buffer_item.setMaximum(30)
             self.export_video_buffer_item.setValue(settings['Recorder'].get('export_video_buffer'))
-            tab_layout.addLayout(self.export_video_buffer_label, 13, 0)
-            tab_layout.addWidget(self.export_video_buffer_item, 13, 1)
+            tab_layout.addLayout(self.export_video_buffer_label, 11, 0)
+            tab_layout.addWidget(self.export_video_buffer_item, 11, 1)
 
             self.reference_frame_distance_label = CreateLabelWithTip("Reference Frame Distance", "The software uses a reference frame (without the ball) for detection. Select how many frames before the first detected ball this frame should be recorded")
             self.reference_frame_distance_item = QSpinBox()
             self.reference_frame_distance_item.setMinimum(5)
             self.reference_frame_distance_item.setMaximum(60)
             self.reference_frame_distance_item.setValue(settings['Recorder'].get('reference_frame_distance'))
-            tab_layout.addLayout(self.reference_frame_distance_label, 14, 0)
-            tab_layout.addWidget(self.reference_frame_distance_item, 14, 1)
+            tab_layout.addLayout(self.reference_frame_distance_label, 12, 0)
+            tab_layout.addWidget(self.reference_frame_distance_item, 12, 1)
 
             self.time_before_detection_label = CreateLabelWithTip("Time Recorded Before Shot", "Define how many seconds should be in the final tracking video before the ball is first detected")
             self.time_before_detection_item = QDoubleSpinBox()
@@ -580,8 +563,8 @@ class SettingsTab(QWidget):
             self.time_before_detection_item.setSingleStep(0.1)
             self.time_before_detection_item.setDecimals(1)
             self.time_before_detection_item.setValue(settings['Recorder'].get('time_before_detection'))
-            tab_layout.addLayout(self.time_before_detection_label, 15, 0)
-            tab_layout.addWidget(self.time_before_detection_item, 15, 1)
+            tab_layout.addLayout(self.time_before_detection_label, 13, 0)
+            tab_layout.addWidget(self.time_before_detection_item, 13, 1)
 
             self.time_after_shot_label = CreateLabelWithTip("Time Recorded After Shot", "Define how many seconds should be in the videos after the ball enters the pins")
             self.time_after_shot_item = QDoubleSpinBox()
@@ -590,16 +573,16 @@ class SettingsTab(QWidget):
             self.time_after_shot_item.setSingleStep(0.1)
             self.time_after_shot_item.setDecimals(1)
             self.time_after_shot_item.setValue(settings['Recorder'].get('time_after_shot'))
-            tab_layout.addLayout(self.time_after_shot_label, 16, 0)
-            tab_layout.addWidget(self.time_after_shot_item, 16, 1)
+            tab_layout.addLayout(self.time_after_shot_label, 14, 0)
+            tab_layout.addWidget(self.time_after_shot_item, 14, 1)
 
             self.detection_threshold_label = CreateLabelWithTip("Detection Threshold", "Define how many circle must be detected to start/finish recording within each defined Detection Bounds")
             self.detection_threshold_item = QSpinBox()
             self.detection_threshold_item.setMinimum(1)
             self.detection_threshold_item.setMaximum(10)
             self.detection_threshold_item.setValue(settings['Recorder'].get('detection_threshold'))
-            tab_layout.addLayout(self.detection_threshold_label, 17, 0)
-            tab_layout.addWidget(self.detection_threshold_item, 17, 1)
+            tab_layout.addLayout(self.detection_threshold_label, 15, 0)
+            tab_layout.addWidget(self.detection_threshold_item, 15, 1)
 
         # Set the GUI elements for the tab "Ball Detection"
         elif setting == "Ball Detection":
@@ -890,8 +873,6 @@ class SettingsTab(QWidget):
                 'pins_flipped': self.pins_flipped_item.currentText(),
                 'recorder_start_bounds': self.recorder_start_bounds_str,
                 'recorder_end_bounds': self.recorder_end_bounds_str,
-                'recorder_frame_rate': self.recorder_frame_rate_item.value(),
-                'pins_frame_rate': self.pins_frame_rate_item.value(),
                 'export_video_buffer': self.export_video_buffer_item.value(),
                 'reference_frame_distance': self.reference_frame_distance_item.value(),
                 'time_before_detection': self.time_before_detection_item.value(),

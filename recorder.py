@@ -58,11 +58,11 @@ class RecorderWorker(QThread):
         self.pins_flipped = config.get('Recorder', 'pins_flipped')
 
         self.reference_frame_distance = config.getint('Recorder', 'reference_frame_distance')
-        self.frames_before_detection = round(config.getfloat('Recorder','time_before_detection') * self.frame_rate)
-        self.frames_after_shot = round(config.getfloat('Recorder', 'time_after_shot') * self.frame_rate)
+        self.frames_before_detection = round(config.getfloat('Recorder','time_before_detection') * 25)
+        self.frames_after_shot = round(config.getfloat('Recorder', 'time_after_shot') * 25)
         self.frames_after_shot_restore = self.frames_after_shot
         self.export_video_buffer_length = config.getint('Recorder', 'export_video_buffer')
-        self.pins_video_frame_buffer = deque(maxlen=self.frame_rate_pins * self.export_video_buffer_length)
+        self.pins_video_frame_buffer = deque(maxlen=60 * self.export_video_buffer_length)
         self.preshot_video_frame_buffer = deque(maxlen= self.frames_before_detection)
 
         self.ksize = self.config.getint('Ball Detection', 'blurred_kernel')
@@ -121,6 +121,9 @@ class RecorderWorker(QThread):
         self.start_pins_buffering.connect(self.pins_camera_worker.StartBuffering)
         self.stop_pins_buffering.connect(self.pins_camera_worker.StopBuffering)
         
+        self.tracking_camera_worker.camera_error_signal.connect(self.ShowCameraError)
+        self.pins_camera_worker.camera_error_signal.connect(self.ShowCameraError)
+        
         return True
 
     # Function to process tracking camera frames
@@ -147,6 +150,9 @@ class RecorderWorker(QThread):
         
         if self.pins_flipped == "Yes":
             self.pins_camera_frame = cv2.flip(self.pins_camera_frame, -1)
+    
+    def ShowCameraError(self, title, error_message):
+        QMessageBox.critical(None, title, error_message)
             
     def RenderDifferenceImage(self, frame, reference_frame, source, mode):
         # Convert frame to grayscale
@@ -283,6 +289,7 @@ class RecorderWorker(QThread):
         cut_trigger = "inactive"
         self.lock_preshot_buffer = False
         self.started_pins_buffering = False
+        self.start_tracking_timer = False
         
         # Define the variables holding the frames read from the cameras
         self.tracking_camera_frame = None
@@ -327,7 +334,7 @@ class RecorderWorker(QThread):
         self.ball_tracker.InitializeTracker()
         
         # Connect signals receiving tracked frames from the ball tracker
-        signal_router.finalized_tracked_frame.connect(self.ReceivedTrackedFrame)
+        signal_router.finalized_tracked_frame.connect(self.ReceiveTrackedFrame)
         
         # Emit a signal to show that the recorder is idle and ready to record
         self.recorder_status.emit("idle")
@@ -413,13 +420,13 @@ class RecorderWorker(QThread):
                         frame = self.tracking_camera_frame
                     binary_image = self.RenderDifferenceImage(frame, self.reference_frame, "ball tracking", "tracking")
                     
-                    if not start_tracking_timer:
-                        start_tracking_timer = True
+                    if not self.start_tracking_timer:
+                        self.start_tracking_timer = True
                         start_time_ball_tracking = time.time()
-                    
+
                     # Send the current frame to the ball tracker for tracking
                     self.ball_tracker.TrackFrame(binary_image, frame)
-                    
+
                 # If enough circles at the end of the lane have been detected, activate the cut trigger (run out period to record the pins camera) and keep recording
                 elif self.detection_counter >= self.detection_threshold and self.detection_region == "end":
                     cut_trigger = "active"
@@ -481,8 +488,8 @@ class RecorderWorker(QThread):
                             self.pin_scorer_reading_frame = self.pins_camera_frame
                     
                     # Stop the timer for the ball tracking
-                    if start_tracking_timer:
-                        start_tracking_timer = False
+                    if self.start_tracking_timer:
+                        self.start_tracking_timer = False
                         stop_time_ball_tracking = time.time()
                         
                         # Calculate FPS of the Ball Tracking Camera
@@ -505,24 +512,23 @@ class RecorderWorker(QThread):
                 # Initialize the Tracking Video Writer and write all the tracking frames to file
                 self.output_path_tracking = os.path.join('videos', f'current_tracking_video_lane_{self.lane_number}.mp4')
                 self.out = cv2.VideoWriter(self.output_path_tracking, cv2.VideoWriter_fourcc(*'mp4v'), self.tracking_fps, (self.tracking_camera_width, self.tracking_camera_height))
-                
                 for tracking_frame in self.tracking_buffer:
                     self.out.write(tracking_frame)
-                                    
+                  
                 # Emit a signal to show that the ball_tracker is now calculating all values of the shot and the pin score is read
                 self.recorder_status.emit("calculating")
                 
                 # Perform all calculations and visualizations on the tracked frames
                 self.ball_tracker.CalculateAndDraw()
-                
+
                 # Write the last frame a couple of times into the video
-                for _ in range (self.tracking_fps * 0.3):
+                for _ in range (int(self.tracking_fps * 0.3)):
                     self.out.write(self.tracking_buffer[-1])
-                
+                    
                 # Copy the video file to the end location and release the writer
                 shutil.copy(self.output_path_tracking, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
                 self.out.release()
-
+                
                 # Trigger the Score Reader
                 self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
 
@@ -543,7 +549,7 @@ class RecorderWorker(QThread):
                 self.preshot_video_frame_buffer.clear()
                 self.preshot_video_frame_buffer = deque(maxlen=self.frames_before_detection)
                 self.pins_video_frame_buffer.clear()
-                self.pins_video_frame_buffer = deque(maxlen=self.frame_rate * self.export_video_buffer_length)
+                self.pins_video_frame_buffer = deque(maxlen=30 * self.export_video_buffer_length)
                 self.frames_after_shot = self.frames_after_shot_restore
                 self.lock_preshot_buffer = False
                 self.frames_without_continuous_sweeper_detection = 0
@@ -645,6 +651,7 @@ class FrameCaptureWorker(QThread):
     tracking_frame_captured = pyqtSignal(object)
     pins_frame_captured = pyqtSignal(object)
     buffer_ready = pyqtSignal(list, int)
+    camera_error_signal = pyqtSignal(str, str)
 
     def __init__(self, camera, stop_event, is_pins_camera=False):
         super().__init__()
@@ -671,15 +678,32 @@ class FrameCaptureWorker(QThread):
             self.start_time_buffer = None
 
     def run(self):
-        # Loop for capturing frames of the camera
-        while self.running:
-
-            ret, frame = self.camera.read()
-            if not ret and not self.is_pins_camera:
-                QMessageBox.critical(None, "Camera not readable", "Tracking Camera for this lane could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
+        # Attempt to open the camera, retry if not immediately available
+        retries = 3
+        while retries > 0:
+            if not self.camera.isOpened():
+                time.sleep(1)
+                retries -= 1
+            else:
                 break
-            elif not ret and is_pins_camera:
-                QMessageBox.critical(None, "Camera not readable", "Pins Camera for this lane could not be accessed. Please ensure the camera is working and correctly selected in the settings.")
+
+        # If camera could not be opened after retries, show an error
+        if not self.camera.isOpened():
+            if self.is_pins_camera:
+                self.camera_error_signal.emit("Camera not readable", "Pins Camera for this lane could not be accessed after multiple attempts. Please check the camera connection.")
+            else:
+                self.camera_error_signal.emit("Camera not readable", "Tracking Camera for this lane could not be accessed after multiple attempts. Please check the camera connection.")
+            
+            self.running = False
+
+        # Proceed to capture frames once the camera is opened successfully
+        while self.running:
+            ret, frame = self.camera.read()
+            if not ret:
+                if self.is_pins_camera:
+                    self.camera_error_signal.emit("Camera not readable", "Pins Camera for this lane could not be accessed during capture. Please ensure the camera is working.")
+                else:
+                    self.camera_error_signal.emit("Camera not readable", "Tracking Camera for this lane could not be accessed during capture. Please ensure the camera is working.")
                 break
 
             # Emit the frame based on whether it's a tracking or pins camera frame

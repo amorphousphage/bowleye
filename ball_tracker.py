@@ -200,6 +200,10 @@ class TrackVideo():
         self.detection_bounds = np.array(ast.literal_eval(self.settings['detection_bounds']), dtype=np.int32)
         self.lane_bounds = np.array(ast.literal_eval(self.settings['lane_bounds']), dtype=np.int32)
 
+        # Set the video export paarameters
+        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.settings['margins_video_export']
+        self.max_x_videoexport = self.detection_bounds[0][2][0] - self.settings['margins_video_export']
+        
         #Gray the reference frame supplied to this function
         self.reference_frame_gray = cv2.cvtColor(self.reference_frame, cv2.COLOR_BGR2GRAY)
 
@@ -313,14 +317,12 @@ class TrackVideo():
             with open('ball_tracking_data_lane_' + str(self.lane_number) +'.json', 'w') as f:
                 json.dump(tracking_data, f)
 
-            self.out.release()
-            shutil.copy(self.output_video_path, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
-
             if self.settings['show_debug_image']:
                 self.debug_out.release()
                 shutil.copy(self.output_debug_video_path, "videos/debugging_video_lane_" + str(self.lane_number) + ".mp4")
             # Emit a Tracking failed signal
             signal_router.tracking_unsuccessful.emit()
+
             return None
 
         ################

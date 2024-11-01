@@ -10,7 +10,7 @@ import time
 from ball_tracker import TrackVideo
 from scorer import PinScorer
 from signal_router import signal_router
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, QThread, QObject
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QThread, QObject, Qt
 from PyQt5.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QLabel, QApplication
 from PyQt5.QtGui import QPixmap, QImage
 from threading import Lock, Event
@@ -114,9 +114,9 @@ class RecorderWorker(QThread):
         self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, self.pins_frame_stopped_event, is_pins_camera=True)
         
         # Connect the signals to the appropriate slots
-        self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame)
-        self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame)
-        self.pins_camera_worker.buffer_ready.connect(self.ReceivePinsBuffer)
+        self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame, type=Qt.QueuedConnection)
+        self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame, , type=Qt.QueuedConnection)
+        self.pins_camera_worker.buffer_ready.connect(self.ReceivePinsBuffer, type=Qt.QueuedConnection)
         
         self.start_pins_buffering.connect(self.pins_camera_worker.StartBuffering)
         self.stop_pins_buffering.connect(self.pins_camera_worker.StopBuffering)
@@ -461,6 +461,7 @@ class RecorderWorker(QThread):
 
                 # Show the debugging image if enabled and if a reference_frame has been set
                 if self.show_debugging_image == "Yes" and self.pin_scorer_ref_frame is not None:
+                    
                     self.RenderDifferenceImage(pins_frame, self.pin_scorer_ref_frame, "pins", "debugging")
 
                 if self.sweeper_detected == True:
@@ -673,8 +674,11 @@ class FrameCaptureWorker(QThread):
         with self.buffer_lock:
             # Stop buffering and emit the buffer to the RecorderWorker
             self.buffering = False
-            print("Took ", int(time.time() - self.start_time_buffer), " sec. to buffer ", len(self.buffer), " frames yielding ", int(len(self.buffer) / (time.time() - self.start_time_buffer)), " FPS for the pins camera buffering")
-            self.buffer_ready.emit(self.buffer, int(len(self.buffer) / (time.time() - self.start_time_buffer))) # Emit the buffer and the achieved FPS
+            fps_pins = int(len(self.buffer) / (time.time() - self.start_time_buffer))
+            
+            # Emit the buffer together with its calculated FPS to write the video file
+            print("Took ", int(time.time() - self.start_time_buffer), " sec. to buffer ", len(self.buffer), " frames yielding ", fps_pins, " FPS for the pins camera buffering")
+            self.buffer_ready.emit(self.buffer, fps_pins) # Emit the buffer and the achieved FPS
             self.start_time_buffer = None
 
     def run(self):

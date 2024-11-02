@@ -115,7 +115,7 @@ class RecorderWorker(QThread):
         
         # Connect the signals to the appropriate slots
         self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame, type=Qt.QueuedConnection)
-        self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame, , type=Qt.QueuedConnection)
+        self.pins_camera_worker.pins_frame_captured.connect(self.ProcessPinsCameraFrame, type=Qt.QueuedConnection)
         self.pins_camera_worker.buffer_ready.connect(self.ReceivePinsBuffer, type=Qt.QueuedConnection)
         
         self.start_pins_buffering.connect(self.pins_camera_worker.StartBuffering)
@@ -503,19 +503,21 @@ class RecorderWorker(QThread):
 
             # If the last frame to be recorded is reached, write the pin video and release both video files, then trigger the analysis and reset the variables for the next shot
             elif cut_trigger == "active" and self.frames_after_shot <= -1:
+                
                 if self.started_pins_buffering:
                     self.stop_pins_buffering.emit()
                     self.started_pins_buffering = False
-
+                
                 # Write pin score reading reference frame as pin image to be statically displayed
                 cv2.imwrite('videos/pins_new_' + str(self.lane_number) + '.png', self.pin_scorer_ref_frame)
                 
                 # Initialize the Tracking Video Writer and write all the tracking frames to file
                 self.output_path_tracking = os.path.join('videos', f'current_tracking_video_lane_{self.lane_number}.mp4')
-                self.out = cv2.VideoWriter(self.output_path_tracking, cv2.VideoWriter_fourcc(*'mp4v'), self.tracking_fps, (self.tracking_camera_width, self.tracking_camera_height))
+                self.out = cv2.VideoWriter(self.output_path_tracking, cv2.VideoWriter_fourcc(*'mp4v'), 19, (self.tracking_camera_width, self.tracking_camera_height))
+                print("length tracking buffer: ", len(self.tracking_buffer))
                 for tracking_frame in self.tracking_buffer:
                     self.out.write(tracking_frame)
-                  
+                 
                 # Emit a signal to show that the ball_tracker is now calculating all values of the shot and the pin score is read
                 self.recorder_status.emit("calculating")
                 
@@ -527,8 +529,8 @@ class RecorderWorker(QThread):
                     self.out.write(self.tracking_buffer[-1])
                     
                 # Copy the video file to the end location and release the writer
-                shutil.copy(self.output_path_tracking, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
                 self.out.release()
+                shutil.copy(self.output_path_tracking, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
                 
                 # Trigger the Score Reader
                 self.scorer = PinScorer(self.pin_scorer_ref_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
@@ -568,14 +570,14 @@ class RecorderWorker(QThread):
 
                 # Emit a signal to show that the recorder is idle and ready to record
                 self.recorder_status.emit("idle")
-
+                
                 # Calculate the average time it took for the while loop to run and reset the timer
                 average_time_elapsed = sum(time_elapsed_list) / len(time_elapsed_list)
                 print(f"Average while loop FPS: {int(1 / average_time_elapsed)}")
 
                 start_time = None
                 time_elapsed_list = []
-        
+
         # Stop the camera workers
         self.tracking_camera_worker.stop()
         self.pins_camera_worker.stop()

@@ -520,16 +520,16 @@ class LaneTab(QWidget):
                                                 'tracked_new_' + str(self.lane_number) + '.mp4')
         ball_tracking_content = QMediaContent(QUrl.fromLocalFile(ball_tracking_video_path))
         self.ball_tracking_media_player.setMedia(ball_tracking_content)
-
     # Function to load the video from the pins camera
     def LoadPinsContent(self):
         # Load the media content for the pin video
         pins_video_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'videos', 'pins_new_' + str(self.lane_number) + '.mp4')
         pins_content = QMediaContent(QUrl.fromLocalFile(pins_video_path))
         self.pins_media_player.setMedia(pins_content)
-
+        
     # Function to load the animation if tracking was unsuccessful
     def LoadBallTrackingUnsuccessfulContent(self):
+        
         # Path to the .gif file
         gif_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'templates', 'tracking_unsuccessful.gif')
 
@@ -547,7 +547,7 @@ class LaneTab(QWidget):
         # Make sure the QLabel is visible
         self.ball_tracking_image.show()
         self.ball_tracking_video.hide()
-
+        
     # Function to save any video file
     def SaveContent(self, content, lane_number):
         # Define the variables of setting a name, game number and frame number
@@ -897,7 +897,7 @@ class LaneTab(QWidget):
         if status == "idle":
             self.recorder_status_label.setText("Recorder idle. Ready for next shot!")
             self.recorder_status_label.setStyleSheet("color: #70ff8f;")
-
+            
         if status == "recorder offline":
             self.recorder_status_label.setText("Recorder is not running!")
             self.recorder_status_label.setStyleSheet("")

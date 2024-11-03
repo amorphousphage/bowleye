@@ -21,6 +21,7 @@ class RecorderWorker(QThread):
     recorder_status = pyqtSignal(str)
     start_pins_buffering = pyqtSignal()
     stop_pins_buffering = pyqtSignal()
+    pin_video_export_completed = Event()
 
     def __init__(self, lane_number):
         super().__init__()
@@ -30,6 +31,9 @@ class RecorderWorker(QThread):
 
         # Set the running mode to active
         self.running = True
+        
+        # Define an event that signals when pins video exporting is completed
+        pin_video_export_completed = Event()
 
     # Function to load all necessary settings
     def InitializeSettings(self):
@@ -248,7 +252,7 @@ class RecorderWorker(QThread):
     # Function to process the buffered frames from the pins camera for a shot
     @pyqtSlot(list, int)
     def ReceivePinsBuffer(self, pins_buffer, fps_pins):
-
+        # Set the new pin buffer        
         self.pins_video_frame_buffer = pins_buffer
         
         # Initialize the Pin Video Writer
@@ -257,17 +261,16 @@ class RecorderWorker(QThread):
 
         print("Pins Video Frames: " , len(self.pins_video_frame_buffer))
         print("Pins Video FPS: ", fps_pins)
-        print("Projected Pins Video length: ", len(self.pins_video_frame_buffer) / fps_pins, " seconds.")
+        print("Projected Pins Video length: ", round(len(self.pins_video_frame_buffer) / fps_pins, 1), " seconds.")
 
         # Process and save the frames in the buffer to the pins video file
         for frame in self.pins_video_frame_buffer:
             # Flip the frame if enabled
             if self.pins_flipped == "Yes":
                 frame = cv2.flip(frame, -1)
-            
-            # Write each frame to the video file    
+                
             self.out_pins.write(frame)
-
+            
         # Release the Pin Video Writer
         self.out_pins.release()
         self.out_pins = None
@@ -275,6 +278,9 @@ class RecorderWorker(QThread):
         # Copy the exported pins video from recordings folder to videos to not overwrite it with the re-inialization of the file at the end of the shot
         self.output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
         shutil.copy(self.output_path_pins, self.output_path_pins_saved)
+        
+        # Set Event to signal export completed
+        self.pin_video_export_completed.set()
     
     # Function to process a finalized tracked frame sent back by the ball tracker
     @pyqtSlot(object)
@@ -553,6 +559,9 @@ class RecorderWorker(QThread):
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
 
                 signal_router.pins_standing_signal.emit(standing_pins)
+                
+                self.pin_video_export_completed.wait()
+                self.pin_video_export_completed.clear()
 
                 # Emit a signal to show that the recorder is now resetting itself for the next shot
                 self.recorder_status.emit("resetting")

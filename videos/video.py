@@ -13,7 +13,7 @@ ret, frame = cap.read()
 if not ret:
     print("Error: Could not read video file.")
     exit()
-
+frame_number = 1
 # Loop through all frames manually
 while True:
     # Display the current frame
@@ -25,8 +25,10 @@ while True:
     # Check the pressed key
     if key == ord('n'):  # Press 'n' to go to the next frame
         ret, frame = cap.read()
+        frame_number += 1
+        
         if not ret:
-            print("End of video reached.")
+            print("End of video reached. Frames: ", frame_number)
             break
     elif key == ord('p'):  # Press 'p' to go to the previous frame (not supported in OpenCV, just an example)
         print("Previous frame functionality is not supported in OpenCV directly.")

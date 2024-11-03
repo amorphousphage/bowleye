@@ -513,8 +513,9 @@ class RecorderWorker(QThread):
                 
                 # Initialize the Tracking Video Writer and write all the tracking frames to file
                 self.output_path_tracking = os.path.join('videos', f'current_tracking_video_lane_{self.lane_number}.mp4')
-                self.out = cv2.VideoWriter(self.output_path_tracking, cv2.VideoWriter_fourcc(*'mp4v'), 19, (self.tracking_camera_width, self.tracking_camera_height))
-                print("length tracking buffer: ", len(self.tracking_buffer))
+                frame_height, frame_width = self.tracking_buffer[0].shape[:2]
+                self.out = cv2.VideoWriter(self.output_path_tracking, cv2.VideoWriter_fourcc(*'mp4v'), self.tracking_fps, (frame_width, frame_height))
+                
                 for tracking_frame in self.tracking_buffer:
                     self.out.write(tracking_frame)
                  

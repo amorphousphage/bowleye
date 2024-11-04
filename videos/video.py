@@ -1,4 +1,5 @@
 import cv2
+import time
 
 # Load the video file
 video_path = "pins_new_12.mp4"
@@ -7,6 +8,7 @@ cap = cv2.VideoCapture(video_path)
 if not cap.isOpened():
     print("Error: Could not open video file.")
     exit()
+start_time = time.time()
 
 # Read the first frame
 ret, frame = cap.read()
@@ -17,25 +19,18 @@ frame_number = 1
 # Loop through all frames manually
 while True:
     # Display the current frame
-    cv2.imshow("Frame Viewer", frame)
+    #cv2.imshow("Frame Viewer", frame)
 
-    # Wait for key event
-    key = cv2.waitKey(0)
-
-    # Check the pressed key
-    if key == ord('n'):  # Press 'n' to go to the next frame
-        ret, frame = cap.read()
-        frame_number += 1
+    ret, frame = cap.read()
+    frame_number += 1
         
-        if not ret:
-            print("End of video reached. Frames: ", frame_number)
-            break
-    elif key == ord('p'):  # Press 'p' to go to the previous frame (not supported in OpenCV, just an example)
-        print("Previous frame functionality is not supported in OpenCV directly.")
-    elif key == ord('q'):  # Press 'q' to quit
-        print("Exiting...")
+    if not ret:
+        time_spent = time.time() - start_time
+        fps = int(frame_number / time_spent)
+        print("End of video reached. FPS: ", fps)
         break
 
 # Release the video capture object and close the window
 cap.release()
-cv2.destroyAllWindows()
+#cv2.destroyAllWindows()
+

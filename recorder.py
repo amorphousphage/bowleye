@@ -21,7 +21,6 @@ class RecorderWorker(QThread):
     recorder_status = pyqtSignal(str)
     start_pins_buffering = pyqtSignal()
     stop_pins_buffering = pyqtSignal()
-    pin_video_export_completed = Event()
 
     def __init__(self, lane_number):
         super().__init__()
@@ -274,7 +273,8 @@ class RecorderWorker(QThread):
         # Release the Pin Video Writer
         self.out_pins.release()
         self.out_pins = None
-
+        self.pins_video_frame_buffe.clear()
+        
         # Copy the exported pins video from recordings folder to videos to not overwrite it with the re-inialization of the file at the end of the shot
         self.output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
         shutil.copy(self.output_path_pins, self.output_path_pins_saved)
@@ -559,9 +559,6 @@ class RecorderWorker(QThread):
                 standing_pins = self.scorer.PinsStillStanding(self.pin_scorer_reading_frame)
 
                 signal_router.pins_standing_signal.emit(standing_pins)
-                
-                self.pin_video_export_completed.wait()
-                self.pin_video_export_completed.clear()
 
                 # Emit a signal to show that the recorder is now resetting itself for the next shot
                 self.recorder_status.emit("resetting")
@@ -574,8 +571,6 @@ class RecorderWorker(QThread):
                 self.detection_counter = 0
                 self.preshot_video_frame_buffer.clear()
                 self.preshot_video_frame_buffer = deque(maxlen=self.frames_before_detection)
-                self.pins_video_frame_buffer.clear()
-                self.pins_video_frame_buffer = deque(maxlen=30 * self.export_video_buffer_length)
                 self.frames_after_shot = self.frames_after_shot_restore
                 self.lock_preshot_buffer = False
                 self.frames_without_continuous_sweeper_detection = 0

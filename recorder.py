@@ -251,6 +251,7 @@ class RecorderWorker(QThread):
     # Function to process the buffered frames from the pins camera for a shot
     @pyqtSlot(list, int)
     def ReceivePinsBuffer(self, pins_buffer, fps_pins):
+        print("Starting pins export")
         # Set the new pin buffer        
         self.pins_video_frame_buffer = pins_buffer
         
@@ -277,6 +278,7 @@ class RecorderWorker(QThread):
         
         # Set Event to signal export completed
         signal_router.pins_video_available.emit()
+        print("Finished pin export")
     
     # Function to process a finalized tracked frame sent back by the ball tracker
     @pyqtSlot(object)
@@ -510,10 +512,11 @@ class RecorderWorker(QThread):
                         
                         # Calculate FPS of the Ball Tracking Camera
                         self.tracking_fps = int(len(self.tracking_buffer) / (stop_time_ball_tracking - start_time_ball_tracking))
-
+                    
                     # Trigger the Score Reading in a seperate thread to run concurrently
-                    ScorerWorker(self.pin_scorer_ref_frame, self.pin_scorer_reading_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates'))).start()
-
+                    self.scorer_worker = ScorerWorker(self.pin_scorer_ref_frame, self.pin_scorer_reading_frame, ast.literal_eval(self.config.get('Pin Scorer', 'pin_coordinates')))
+                    self.scorer_worker.start()
+                    
                     # Emit a signal to show that the recorder is now saving the video files
                     self.recorder_status.emit("generating video")
 

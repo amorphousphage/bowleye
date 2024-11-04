@@ -6,6 +6,7 @@ from PyQt5.QtGui import QImage
 class SignalRouter(QObject):
     tracking_data_available = pyqtSignal()
     tracking_unsuccessful = pyqtSignal()
+    pins_video_available = pyqtSignal()
     pins_standing_signal = pyqtSignal(list)
     finished = pyqtSignal()
     debugging_image = pyqtSignal(QImage)

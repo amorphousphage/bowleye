@@ -387,16 +387,14 @@ class LaneTab(QWidget):
 
         # Connect the finish tracking signal also to reloading and playing the video contents
         signal_router.tracking_data_available.connect(self.LoadBallTrackingContent)
-        signal_router.tracking_data_available.connect(self.LoadPinsContent)
+        signal_router.pins_video_available.connect(self.LoadPinsContent)
+
         # Play the contents with some time delay
         signal_router.tracking_data_available.connect(lambda: self.PlayContent("ball_tracking", 50))
-        signal_router.tracking_data_available.connect(lambda: self.PlayContent("pins", 2000))
+        signal_router.pins_video_available.connect(lambda: self.PlayContent("pins", 2000))
 
         # Connect the signal to load content when tracking was unsuccessful
         signal_router.tracking_unsuccessful.connect(self.LoadBallTrackingUnsuccessfulContent)
-        signal_router.tracking_unsuccessful.connect(self.LoadPinsContent)
-        # Play the contents with some time delay
-        signal_router.tracking_unsuccessful.connect(lambda: self.PlayContent("pins", 2000))
 
         # Connect the signal for the debugging image to a function displaying it
         signal_router.debugging_image.connect(partial(self.ShowDebuggingImage, "tracking"))
@@ -887,7 +885,7 @@ class LaneTab(QWidget):
             self.recorder_status_label.setStyleSheet("color: orange;")
 
         if status == "calculating":
-            self.recorder_status_label.setText("Calculating Ball Track, Values and Reading Pin Score...")
+            self.recorder_status_label.setText("Calculating Ball Track and Values")
             self.recorder_status_label.setStyleSheet("color: blue;")
 
         if status == "resetting":

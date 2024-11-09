@@ -110,8 +110,8 @@ class RecorderWorker(QThread):
         self.pins_frame_stopped_event = Event()
 
         # Create worker threads for both cameras
-        self.tracking_camera_worker = FrameCaptureWorker(self.cap, self.tracking_frame_stopped_event, is_pins_camera=False, self.lane_number)
-        self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, self.pins_frame_stopped_event, is_pins_camera=True, self.lane_number)
+        self.tracking_camera_worker = FrameCaptureWorker(self.cap, self.tracking_frame_stopped_event, self.lane_number, is_pins_camera=False, video_flipped="No")
+        self.pins_camera_worker = FrameCaptureWorker(self.cap_pins, self.pins_frame_stopped_event, self.lane_number, is_pins_camera=True, video_flipped=self.pins_flipped)
         
         # Connect the signals to the appropriate slots
         self.tracking_camera_worker.tracking_frame_captured.connect(self.ProcessTrackingCameraFrame, type=Qt.QueuedConnection)
@@ -648,7 +648,7 @@ class FrameCaptureWorker(QThread):
     pins_frame_captured = pyqtSignal(object)
     camera_error_signal = pyqtSignal(str, str)
 
-    def __init__(self, camera, stop_event, is_pins_camera=False, pins_flipped="No", lane_number):
+    def __init__(self, camera, stop_event, lane_number, is_pins_camera=False, video_flipped="No"):
         super().__init__()
         self.camera = camera
         self.stop_event = stop_event
@@ -659,7 +659,7 @@ class FrameCaptureWorker(QThread):
         self.recording_active_event = Event()
         self.pins_video_export_completed = Event()
         self.pins_frame_buffer = []
-        self.pins_flipped = pins_flipped
+        self.video_flipped = video_flipped
         self.lane_number = lane_number
 
     # Function to start writing pins camera frames into a buffer for a shot
@@ -689,7 +689,7 @@ class FrameCaptureWorker(QThread):
         out_pins = cv2.VideoWriter(output_path_pins, cv2.VideoWriter_fourcc(*'mp4v'), fps_pins, (pins_frame_width, pins_frame_height))
 
         for frame in self.pins_frame_buffer:
-            if self.pins_flipped == "Yes":
+            if self.video_flipped == "Yes":
                 frame = cv2.flip(frame, -1)
             out_pins.write(frame)
 

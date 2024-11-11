@@ -892,6 +892,10 @@ class LaneTab(QWidget):
             self.recorder_status_label.setText("Resetting Recorder...")
             self.recorder_status_label.setStyleSheet("color: purple;")
 
+        if status == "waiting for pin export completion":
+            self.recorder_status_label.setText("Waiting for the Pin Video Export to finish...")
+            self.recorder_status_label.setStyleSheet("color: purple;")
+
         if status == "idle":
             self.recorder_status_label.setText("Recorder idle. Ready for next shot!")
             self.recorder_status_label.setStyleSheet("color: #70ff8f;")

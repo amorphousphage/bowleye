@@ -558,11 +558,11 @@ class RecorderWorker(QThread):
 
                 # Re-initialize the Ball Tracker
                 self.ball_tracker.InitializeTracker()
-
+                
                 # Wait for the pin video export to finish and clear the signal for next shot
                 self.pins_camera_worker.pins_video_export_completed.wait()
                 self.pins_camera_worker.pins_video_export_completed.clear()
-
+                
                 # Start the recording of the tracking camera again
                 if not self.tracking_camera_worker.recording_active_event.is_set():
                     self.tracking_camera_worker.recording_active_event.set()
@@ -680,14 +680,14 @@ class FrameCaptureWorker(QThread):
             fps_pins = int(len(self.pins_frame_buffer) / (time.time() - self.start_time_buffer))
         print("Pin Camera FPS: ", fps_pins)
         self.ExportPinsVideo(fps_pins)
-
+    
     def ExportPinsVideo(self, fps_pins):
-        print("Starting pin export")
         # Initialize Video Writer
         output_path_pins = os.path.join('recordings', f'pins_new_{self.lane_number}.mp4')
         pins_frame_height, pins_frame_width = self.pins_frame_buffer[0].shape[:2]
         out_pins = cv2.VideoWriter(output_path_pins, cv2.VideoWriter_fourcc(*'mp4v'), fps_pins, (pins_frame_width, pins_frame_height))
         i = 1
+        
         for frame in self.pins_frame_buffer:
             if self.video_flipped == "Yes":
                 frame = cv2.flip(frame, -1)
@@ -702,7 +702,6 @@ class FrameCaptureWorker(QThread):
         output_path_pins_saved = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
         shutil.copy(output_path_pins, output_path_pins_saved)
 
-        print("Finished pin export")
         signal_router.pins_video_available.emit()
         self.pins_video_export_completed.set()
 

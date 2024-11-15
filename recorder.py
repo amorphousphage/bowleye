@@ -143,11 +143,11 @@ class RecorderWorker(QThread):
         # Flip the frame if required, immediately after receiving it
         if self.pins_flipped == "Yes":
             frame_pins = cv2.flip(frame_pins, -1)
-
+        
          # Update pins_camera_frame with the frame
         with self.pins_frame_lock:
             self.pins_camera_frame = frame_pins
-
+            
         # Set the event to signalize the first frame has been captured since the camera was (re)started
         if not self.pins_frame_ready_event.is_set():
             self.pins_frame_ready_event.set()
@@ -302,16 +302,12 @@ class RecorderWorker(QThread):
 
     # Function to wait for the pin video export completion from the FrameCaptureWorker before starting to monitor for new shots
     def WaitForPinVideoExportCompletion(self):
-        print(1)
         # Create a temporary event loop
         self.pin_export_wait_loop = QEventLoop()
-        print(2)
         # Connect the signal to the event loop's quit method
         signal_router.pins_video_available.connect(self.pin_export_wait_loop.quit)
-        print(3)
         # Start the event loop, which will block until pins_video_available is emitted
         self.pin_export_wait_loop.exec_()
-        print(4)
         self.pin_export_wait_loop = None
         
     # Function to execute once the recorder is called
@@ -798,14 +794,12 @@ class PinsVideoExportWorker(QThread):
 
         # Initialize a video writer
         out_pins = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps_pins, (pins_frame_width, pins_frame_height))
-        i = 1
+        
         # Export all frames
         for frame in self.buffer:
             if self.video_flipped == "Yes":
                 frame = cv2.flip(frame, -1)
             out_pins.write(frame)
-            print("Frame ", i, " of", len(self.buffer), " exported.")
-            i += 1
 
         # Release the video writer
         out_pins.release()

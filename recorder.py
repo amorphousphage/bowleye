@@ -302,16 +302,18 @@ class RecorderWorker(QThread):
 
     # Function to wait for the pin video export completion from the FrameCaptureWorker before starting to monitor for new shots
     def WaitForPinVideoExportCompletion(self):
-
+        print(1)
         # Create a temporary event loop
-        pin_export_wait_loop = QEventLoop()
-
+        self.pin_export_wait_loop = QEventLoop()
+        print(2)
         # Connect the signal to the event loop's quit method
-        self.signal_router.pins_video_available.connect(pin_export_wait_loop.quit)
-
+        signal_router.pins_video_available.connect(self.pin_export_wait_loop.quit)
+        print(3)
         # Start the event loop, which will block until pins_video_available is emitted
-        pin_export_wait_loop.exec_()
-
+        self.pin_export_wait_loop.exec_()
+        print(4)
+        self.pin_export_wait_loop = None
+        
     # Function to execute once the recorder is called
     def run(self):
         
@@ -624,6 +626,7 @@ class RecorderWorker(QThread):
 
                 # Trigger the event loop to wait for the Pin Video Export Completion before starting to monitor for a new shot
                 self.recorder_status.emit("waiting for pin export completion")
+                
                 self.WaitForPinVideoExportCompletion()
                 
                 # Start the recording of the tracking camera again
@@ -720,7 +723,7 @@ class FrameCaptureWorker(QThread):
         self.pins_frame_buffer.clear()
 
         # Emit signal when completed
-        self.signal_router.pins_video_available.emit()
+        signal_router.pins_video_available.emit()
 
 
     def run(self):
@@ -781,14 +784,13 @@ class FrameCaptureWorker(QThread):
 class PinsVideoExportWorker(QThread):
     def __init__(self, fps_pins, buffer, video_flipped, output_path):
         super().__init__()
-
         # Define the variables used
         self.fps_pins = fps_pins
         self.buffer = buffer
         self.video_flipped = video_flipped
         self.output_path = output_path
 
-    # Function to perform the export
+# Function to perform the export
     def run(self):
 
         # Obtain the height and width of the frames to export

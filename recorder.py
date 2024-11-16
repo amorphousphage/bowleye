@@ -442,9 +442,17 @@ class RecorderWorker(QThread):
 
                     # Start the pins camera if it is not running
                     if not self.pins_camera_worker.recording_active_event.is_set():
+                        print("Pins Camera activated for Reference Picture")
                         self.pins_camera_worker.recording_active_event.set()
-                        # Wait for the first pins camera image
-                        self.pins_frame_ready_event.wait()
+
+                        # Wait for the first pins camera frame
+                        while True:
+                            # Wait for a frame to be ready
+                            self.pins_frame_ready_event.wait()
+                            # Only leave the while loop when a new frame was read
+                            with self.pins_frame_lock:
+                                if self.pins_camera_frame is not None:
+                                    break
 
                     # Set the current pins camera frame to be the reference for score counting later
                     with self.pins_frame_lock:
@@ -613,6 +621,10 @@ class RecorderWorker(QThread):
                 self.sweeper_count = 0
                 self.pin_scorer_ref_frame = None
                 self.pin_scorer_reading_frame = None
+                with self.pins_frame_lock:
+                    self.pins_camera_frame = None
+                with self.tracking_frame_lock:
+                    self.tracking_camera_frame = None
                 frame = None
                 pins_frame = None
                 self.tracking_buffer = []

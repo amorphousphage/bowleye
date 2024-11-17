@@ -734,6 +734,7 @@ class FrameCaptureWorker(QThread):
             
         # Proceed to capture frames once the camera is opened successfully
         while self.running:
+            # If the Recording Active event is not set, wait for it (for the camera to start) and flush the first couple of frames to ensure current frames are being sent
             if not self.recording_active_event.is_set():                
                 # Wait if the recording for the camera is not activated until the event to start recording is set
                 self.recording_active_event.wait()
@@ -757,19 +758,21 @@ class FrameCaptureWorker(QThread):
                 else:
                     self.camera_error_signal.emit("Camera not readable", "Tracking Camera for this lane could not be accessed during capture. Please ensure the camera is working.")
                 break
+            elif frame is None or frame.size == 0:
+                print("Frame is empty for ", self.camera)
 
-            # Emit the frame based on whether it's a tracking or pins camera frame
-            if self.is_pins_camera:
-                self.pins_frame_captured.emit(frame)
-                
-                # If the pin camera buffer is enabled, write the frame to the pin buffer
-                if self.buffering:
-                    self.pins_frame_buffer.append(frame)
-
+            # Only emit (and buffer if applicable) the frame if it is not empty
             else:
-                self.tracking_frame_captured.emit(frame)
-            
+                # Emit the frame based on whether it's a tracking or pins camera frame
+                if self.is_pins_camera:
+                    self.pins_frame_captured.emit(frame)
 
+                    # If the pin camera buffer is enabled, write the frame to the pin buffer
+                    if self.buffering:
+                        self.pins_frame_buffer.append(frame)
+
+                else:
+                    self.tracking_frame_captured.emit(frame)
 
         # Set the event to signal successful stopping of the camera readings (only when the recorder is shut down)
         self.stop_event.set()
@@ -784,11 +787,11 @@ class FrameCaptureWorker(QThread):
 
 # Generate a Thread to asynchronously export the Pins Video Buffer
 class PinsVideoExportWorker(QThread):
-    def __init__(self, fps_pins, buffer, video_flipped, output_path):
+    def __init__(self, fps_pins, pins_buffer, video_flipped, output_path):
         super().__init__()
         # Define the variables used
         self.fps_pins = fps_pins
-        self.buffer = buffer
+        self.pins_buffer = pin_buffer
         self.video_flipped = video_flipped
         self.output_path = output_path
 
@@ -796,20 +799,20 @@ class PinsVideoExportWorker(QThread):
     def run(self):
 
         # Obtain the height and width of the frames to export
-        pins_frame_height, pins_frame_width = self.buffer[0].shape[:2]
+        pins_frame_height, pins_frame_width = self.pins_buffer[0].shape[:2]
 
         # Initialize a video writer
         out_pins = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps_pins, (pins_frame_width, pins_frame_height))
         
         # Export all frames
-        for frame in self.buffer:
+        for frame in self.pins_buffer:
             if self.video_flipped == "Yes":
                 frame = cv2.flip(frame, -1)
             out_pins.write(frame)
 
         # Release the video writer
         out_pins.release()
-        self.buffer = None
+        self.pins_buffer = None
 
 # Create a class to read the pin score in a thread and pass the score to the lane_tab.py for display
 class ScorerWorker(QThread):

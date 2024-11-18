@@ -143,15 +143,16 @@ class RecorderWorker(QThread):
         # Flip the frame if required, immediately after receiving it
         if self.pins_flipped == "Yes":
             frame_pins = cv2.flip(frame_pins, -1)
-        
+            
          # Update pins_camera_frame with the frame
         with self.pins_frame_lock:
             self.pins_camera_frame = frame_pins
-            
+               
         # Set the event to signalize the first frame has been captured since the camera was (re)started
         if not self.pins_frame_ready_event.is_set():
             self.pins_frame_ready_event.set()
-
+            
+            
     # Function to show the Error message if a camera is not accessible
     @pyqtSlot(str, str)
     def ShowCameraError(self, title, error_message):
@@ -468,13 +469,14 @@ class RecorderWorker(QThread):
 
                     # Send the current frame to the ball tracker for tracking
                     self.ball_tracker.TrackFrame(binary_image, frame)
-
+                    
                     # Start the pins camera if it is not running
                     if not self.pins_camera_worker.recording_active_event.is_set():
                         self.pins_camera_worker.recording_active_event.set()
-                        # Wait for the first pins camera image
-                        self.pins_frame_ready_event.wait()
-
+                        
+                    # Wait for the first pins camera image
+                    self.pins_frame_ready_event.wait()
+                    
                     # Start the pins buffering if not started yet
                     if not self.started_pins_buffering:
                         self.start_pins_buffering.emit()
@@ -491,14 +493,13 @@ class RecorderWorker(QThread):
                 # Send the current frame to the ball tracker for tracking
                 self.ball_tracker.TrackFrame(binary_image, frame)
                 
-                # If not set, set the pins reference frame
-                if self.pin_scorer_ref_frame is None:
-                    with self.pins_frame_lock:
-                        self.pin_scorer_ref_frame = self.pins_camera_frame
-                
                 # Obtain the current image from the pins camera
                 with self.pins_frame_lock:
                     pins_frame = self.pins_camera_frame
+                
+                # If not set, set the pins reference frame
+                if self.pin_scorer_ref_frame is None:
+                    self.pin_scorer_ref_frame = pins_frame
 
                 # Generate and show the debugging image if enabled and if a reference_frame has been set
                 if self.show_debugging_image == "Yes" and self.pin_scorer_ref_frame is not None:
@@ -548,6 +549,7 @@ class RecorderWorker(QThread):
                     # Pause recording of both cameras
                     if self.tracking_camera_worker.recording_active_event.is_set():
                         self.tracking_camera_worker.recording_active_event.clear()
+                        
                     if self.pins_camera_worker.recording_active_event.is_set():
                         self.pins_camera_worker.recording_active_event.clear()
 
@@ -606,10 +608,12 @@ class RecorderWorker(QThread):
                 self.pin_scorer_reading_frame = None
                 with self.pins_frame_lock:
                     self.pins_camera_frame = None
-                #with self.tracking_frame_lock:
-                #    self.tracking_camera_frame = None
+                with self.tracking_frame_lock:
+                    self.tracking_camera_frame = None
                 frame = None
                 pins_frame = None
+                self.tracking_frame_ready_event.clear()
+                self.pins_frame_ready_event.clear()
                 self.tracking_buffer = []
                 
                 # Re-initialize the Ball Tracker
@@ -735,10 +739,11 @@ class FrameCaptureWorker(QThread):
         # Proceed to capture frames once the camera is opened successfully
         while self.running:
             # If the Recording Active event is not set, wait for it (for the camera to start) and flush the first couple of frames to ensure current frames are being sent
-            if not self.recording_active_event.is_set():                
+            if not self.recording_active_event.is_set(): 
+                             
                 # Wait if the recording for the camera is not activated until the event to start recording is set
                 self.recording_active_event.wait()
- 
+                
                 # Flush the first couple of frames after (re-starting the camera)
                 for _ in range(5):
                     ret, frame = self.camera.read()
@@ -748,7 +753,6 @@ class FrameCaptureWorker(QThread):
                         else:
                             self.camera_error_signal.emit("Camera not readable", "Tracking Camera for this lane could not be accessed during capture. Please ensure the camera is working.")
                         break
-               
             
             # Read the frame from the camera
             ret, frame = self.camera.read()
@@ -758,21 +762,17 @@ class FrameCaptureWorker(QThread):
                 else:
                     self.camera_error_signal.emit("Camera not readable", "Tracking Camera for this lane could not be accessed during capture. Please ensure the camera is working.")
                 break
-            elif frame is None or frame.size == 0:
-                print("Frame is empty for ", self.camera)
+                
+            # Emit the frame based on whether it's a tracking or pins camera frame
+            if self.is_pins_camera:
+                self.pins_frame_captured.emit(frame)
 
-            # Only emit (and buffer if applicable) the frame if it is not empty
+                # If the pin camera buffer is enabled, write the frame to the pin buffer
+                if self.buffering:
+                    self.pins_frame_buffer.append(frame)
+
             else:
-                # Emit the frame based on whether it's a tracking or pins camera frame
-                if self.is_pins_camera:
-                    self.pins_frame_captured.emit(frame)
-
-                    # If the pin camera buffer is enabled, write the frame to the pin buffer
-                    if self.buffering:
-                        self.pins_frame_buffer.append(frame)
-
-                else:
-                    self.tracking_frame_captured.emit(frame)
+                self.tracking_frame_captured.emit(frame)
 
         # Set the event to signal successful stopping of the camera readings (only when the recorder is shut down)
         self.stop_event.set()
@@ -791,7 +791,7 @@ class PinsVideoExportWorker(QThread):
         super().__init__()
         # Define the variables used
         self.fps_pins = fps_pins
-        self.pins_buffer = pin_buffer
+        self.pins_buffer = pins_buffer
         self.video_flipped = video_flipped
         self.output_path = output_path
 

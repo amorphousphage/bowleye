@@ -242,7 +242,8 @@ class TrackVideo():
         # Define the VideoWriter for the debugging video if necessary
         if self.settings['show_debug_image']:
             self.output_debug_video_path = "videos/debug_new_lane_" + str(self.lane_number) + ".mp4"
-            self.debug_out = cv2.VideoWriter(self.output_debug_video_path, self.fourcc, self.fps, (self.frame_width, self.frame_height))
+            frame_height, frame_width = self.frame.shape[:2]
+            self.debug_out = cv2.VideoWriter(self.output_debug_video_path, cv2.VideoWriter_fourcc(*'mp4v'), 20, (frame_width, frame_height))
 
         # Define a variable to hold the calculated ball speed
         self.ball_speed = None

@@ -8,6 +8,7 @@ This software automatically records a video when it detects a bowling ball going
 - The position (of the ball) at the arrows
 - The position (of the ball) at the breakpoint
 - The ball speed
+- The pins that were left standing
 
 This software operates in two modes:
 - Single Shot mode: Every shot is tracked and displayed, but no values are saved

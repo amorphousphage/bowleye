@@ -1,9 +1,0 @@
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_A1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_B1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_C1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_D1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_E1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_F1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_G1.mp4'
-file '/home/christianteppich/Documents/IT Projekte/Python_Programming/Bowling_Ball_Tracking/videos/tracked_brp1.mp4'
-

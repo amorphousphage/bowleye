@@ -1,6 +1,7 @@
 # import used packages
 import sys
 import traceback
+import faulthandler
 from PyQt5.QtWidgets import QMainWindow, QTabWidget, QDesktopWidget, QApplication, QMessageBox, QPushButton, QWidget, QVBoxLayout, QDialog, QLabel
 from PyQt5.QtCore import pyqtSignal, QRect, Qt, QThread, QSize
 from PyQt5.QtGui import QMovie
@@ -12,7 +13,10 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-
+        
+        # Enable the fault handler to catch errors during development
+        faulthandler.enable()
+        
         # Define the window title
         self.setWindowTitle("BowlEye - Bowling Ball Tracking Software")
 

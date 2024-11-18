@@ -3,11 +3,14 @@ import os
 import datetime
 import shutil
 import configparser
+import numpy as np
+import cv2
+from functools import partial
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, QTabWidget, QRadioButton, QButtonGroup, QGroupBox, QPushButton, QSpinBox, QLineEdit, QLabel, QDesktopWidget, QStyle, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QGridLayout, QSpacerItem, QMessageBox, QSizePolicy
 from PyQt5.QtCore import Qt, QUrl, QThread, pyqtSlot, QTimer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtGui import QPixmap, QFont, QMovie
+from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage
 from pyqt_switch import PyQtSwitch
 from tracking_data_updater import TrackingDataUpdater
 from recorder import RecorderWorker
@@ -168,6 +171,9 @@ class LaneTab(QWidget):
         self.recorder_layout.addWidget(self.recorder_status_label)
         self.recorder_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         self.col2_layout.addLayout(self.recorder_layout)
+        
+        # If the recorder fails to start stop it
+        signal_router.finished.connect(self.StopRecorder)
 
         # Initially set the recording flag to inactive
         self.recording_active = False
@@ -381,18 +387,44 @@ class LaneTab(QWidget):
 
         # Connect the finish tracking signal also to reloading and playing the video contents
         signal_router.tracking_data_available.connect(self.LoadBallTrackingContent)
-        signal_router.tracking_data_available.connect(self.LoadPinsContent)
+        signal_router.pins_video_available.connect(self.LoadPinsContent)
+
         # Play the contents with some time delay
         signal_router.tracking_data_available.connect(lambda: self.PlayContent("ball_tracking", 50))
-        signal_router.tracking_data_available.connect(lambda: self.PlayContent("pins", 2000))
+        signal_router.pins_video_available.connect(lambda: self.PlayContent("pins", 2000))
 
         # Connect the signal to load content when tracking was unsuccessful
         signal_router.tracking_unsuccessful.connect(self.LoadBallTrackingUnsuccessfulContent)
-        signal_router.tracking_unsuccessful.connect(self.LoadPinsContent)
-        # Play the contents with some time delay
-        signal_router.tracking_unsuccessful.connect(lambda: self.PlayContent("pins", 2000))
+
+        # Connect the signal for the debugging image to a function displaying it
+        signal_router.debugging_image.connect(partial(self.ShowDebuggingImage, "tracking"))
+        signal_router.debugging_image_pins.connect(partial(self.ShowDebuggingImage, "pins"))
+
+    def ShowDebuggingImage(self, source, image):
+        # Convert QImage to a format suitable for OpenCV
+        image = image.convertToFormat(QImage.Format_Grayscale8)  # Ensure it's in grayscale format
+        width = image.width()
+        height = image.height()
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        image_array = np.array(ptr).reshape(height, width)  # Convert QImage to NumPy array
+        
+        # Resize the image to 60% of its original size
+        new_width = int(width * 0.6)
+        new_height = int(height * 0.6)
+        resized_image = cv2.resize(image_array, (new_width, new_height))
+
+        # Show the binary image using OpenCV
+        if source == "tracking":
+            cv2.imshow("Debugging Image - Tracking", resized_image)
 
 
+        elif source == "pins":
+            cv2.imshow("Debugging Image - Pins", resized_image)
+            cv2.resizeWindow("Debugging Image - Pins", 800, 600)
+
+        cv2.waitKey(1)
+                
     # Function to update the visibility of the player fields and the table as well as the overlay checkbox
     def updateFieldVisibility(self):
         # When the Record Mode Button is checked, display the player controls and the overlay checkbox
@@ -486,16 +518,16 @@ class LaneTab(QWidget):
                                                 'tracked_new_' + str(self.lane_number) + '.mp4')
         ball_tracking_content = QMediaContent(QUrl.fromLocalFile(ball_tracking_video_path))
         self.ball_tracking_media_player.setMedia(ball_tracking_content)
-
     # Function to load the video from the pins camera
     def LoadPinsContent(self):
         # Load the media content for the pin video
         pins_video_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'videos', 'pins_new_' + str(self.lane_number) + '.mp4')
         pins_content = QMediaContent(QUrl.fromLocalFile(pins_video_path))
         self.pins_media_player.setMedia(pins_content)
-
+        
     # Function to load the animation if tracking was unsuccessful
     def LoadBallTrackingUnsuccessfulContent(self):
+        
         # Path to the .gif file
         gif_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'templates', 'tracking_unsuccessful.gif')
 
@@ -513,7 +545,7 @@ class LaneTab(QWidget):
         # Make sure the QLabel is visible
         self.ball_tracking_image.show()
         self.ball_tracking_video.hide()
-
+        
     # Function to save any video file
     def SaveContent(self, content, lane_number):
         # Define the variables of setting a name, game number and frame number
@@ -838,6 +870,7 @@ class LaneTab(QWidget):
         else:
             self.StopRecorder()
 
+
     # Function to update the Recording label to let the user know what the recorder is doing at the moment
     @pyqtSlot(str)
     def UpdateRecorderStatus(self, status):
@@ -851,18 +884,22 @@ class LaneTab(QWidget):
             self.recorder_status_label.setText("Saving Videos...")
             self.recorder_status_label.setStyleSheet("color: orange;")
 
-        if status == "tracking":
-            self.recorder_status_label.setText("Calculating Track and Values...")
+        if status == "calculating":
+            self.recorder_status_label.setText("Calculating Ball Track and Values")
             self.recorder_status_label.setStyleSheet("color: blue;")
 
         if status == "resetting":
             self.recorder_status_label.setText("Resetting Recorder...")
             self.recorder_status_label.setStyleSheet("color: purple;")
 
+        if status == "waiting for pin export completion":
+            self.recorder_status_label.setText("Waiting for the Pin Video Export to finish...")
+            self.recorder_status_label.setStyleSheet("color: purple;")
+
         if status == "idle":
             self.recorder_status_label.setText("Recorder idle. Ready for next shot!")
             self.recorder_status_label.setStyleSheet("color: #70ff8f;")
-
+            
         if status == "recorder offline":
             self.recorder_status_label.setText("Recorder is not running!")
             self.recorder_status_label.setStyleSheet("")
@@ -895,6 +932,7 @@ class LaneTab(QWidget):
             self.recorder_worker.wait()
             self.recorder_worker = None
             self.recording_active = False
+            cv2.destroyAllWindows()
 
     # Function to Disconnect the Signals and turn off the recorder when the program is closed
     def DisconnectSignalsAndStopRecorder(self):

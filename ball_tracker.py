@@ -13,9 +13,11 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from collections import deque
 from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtCore import pyqtSignal
 from signal_router import signal_router
 
 class TrackVideo():
+    
     def __init__(self, frame, lane_number, reference_frame):
         super().__init__()
 
@@ -43,6 +45,7 @@ class TrackVideo():
         if arrows_template is None:
             QMessageBox.critical(None, "No Arrow Template found!",
                                  "The arrow template is not avaialbe. Please select an arrow template in the settings. Tracker can not successfully continue")
+            signal_router.finished.emit()
             exit()
 
         # Extract region of interest (ROI) based on the defined detection bounds
@@ -65,37 +68,13 @@ class TrackVideo():
         return self.arrow_positions, arrows_template
 
     # Function to detect the ball
-    def DetectBall(self, frame, reference_frame):
-        # Define a global variable to hold the debugging image
-        global debug_frame
-
-        # Convert frame to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Extract region of interest (ROI) based on the defined detection bounds
-        roi = cv2.fillPoly(np.zeros_like(gray), self.detection_bounds, 255)
-
-        # Mask the grayscale frame with the ROI
-        roi_gray = cv2.bitwise_and(gray, gray, mask=roi)
-
-        # Apply a blur to the grayscale frame to reduce noise
-        blurred = cv2.GaussianBlur(roi_gray, (self.settings['blurred_kernel'], self.settings['blurred_kernel']),
-                                   self.settings['blurred_sigma'])
-
-        # Compute the absolute difference between the current frame and the reference frame within the ROI
-        diff_frame = cv2.absdiff(blurred, reference_frame)
-
-        # Apply binary thresholding to segment the circle
-        _, binary = cv2.threshold(diff_frame, self.settings['binary_threshold'], self.settings['binary_max'],
-                                  cv2.THRESH_BINARY)
-
+    def DetectBall(self, binary):
         # Find contours in the binary mask
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
         # Calculate maximum y-axis starting coordinate from the detection_bounds (y-axis coordinate of the roi closes to the foul line)
         starting_y_coordinate = max(
             point[1] for detection_bound in self.detection_bounds for point in detection_bound)
-
+        
         # Loop over the contours
         for contour in contours:
             # Find the center and radius of the enclosing circle for the contour
@@ -116,30 +95,18 @@ class TrackVideo():
                     'x_coordinate_threshold'] < center_bottom[0] < self.centerlist[-1][0] +
                     self.settings['x_coordinate_threshold'])):
                 # Draw the circle and its center bottom on the original image
-                cv2.circle(frame, center, int(radius), (0, 255, 0), 2)
-
+                cv2.circle(self.frame, center, int(radius), (0, 255, 0), 2)
                 # Add the validated center coordinates to a list containing all identified valid center points across frames
                 self.centerlist.append(center_bottom)
-
-        # show any image used in calculation of circles rather than showing the true video image (for debugging purposes)
+        
+        # generate any image used in calculation of circles rather than showing the true video image (for debugging purposes)
         if self.settings['show_debug_image']:
-
-            # show the binary image if set in the settings
-            if self.settings['debugging_image_type'] == "Binary":
                 self.debug_frame = binary[:, self.min_x_videoexport:self.max_x_videoexport]
-
-            # show the difference image if set in settings
-            elif self.settings['debugging_image_type'] == "Difference only":
-                self.debug_frame = diff_frame[:, self.min_x_videoexport:self.max_x_videoexport]
-
-            # Else show the normal image
-            else:
-                self.debug_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Else define the normal image as debug image
         else:
-            self.debug_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
-
+            self.debug_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
+            
         # Return the list of detected circles and the debug_frame
         return self.centerlist, self.debug_frame
 
@@ -213,7 +180,6 @@ class TrackVideo():
             'y_coordinate_threshold' : self.config.getint('Ball Detection','max_vertical_pixel_difference'),
             'x_coordinate_threshold' : self.config.getint('Ball Detection','max_horizontal_pixel_difference'),
             'visualize_minmax_arrow' : self.config.getboolean('Calculations', 'visualize_minmax_arrow'),
-            'tracking_camera_fps' : self.config.getint('Recorder','recorder_frame_rate')
         }
 
         #########################
@@ -234,6 +200,10 @@ class TrackVideo():
         self.detection_bounds = np.array(ast.literal_eval(self.settings['detection_bounds']), dtype=np.int32)
         self.lane_bounds = np.array(ast.literal_eval(self.settings['lane_bounds']), dtype=np.int32)
 
+        # Set the video export paarameters
+        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.settings['margins_video_export']
+        self.max_x_videoexport = self.detection_bounds[0][2][0] - self.settings['margins_video_export']
+        
         #Gray the reference frame supplied to this function
         self.reference_frame_gray = cv2.cvtColor(self.reference_frame, cv2.COLOR_BGR2GRAY)
 
@@ -255,9 +225,8 @@ class TrackVideo():
             self.min_y_arrows = min(arrow[1] for arrow in self.arrow_positions)
 
         else:
-            print("No arrows detected")
-            #QMessageBox.critical(None, "Arrows could not be detected!",
-            #                     "There was an error detecting arrows. The tracker will exit.")
+            QMessageBox.critical(None, "Arrows could not be detected!",
+                                 "There was an error detecting arrows. The tracker will exit.")
             exit()
 
         # Calculate the mean vertical coordinate to calculate the reference line for the position of the arrows
@@ -270,24 +239,11 @@ class TrackVideo():
         #Initialize the point_closest_to_gutter for the breakpoint calculation and storage
         self.point_closest_to_gutter = None
 
-        # Define the bounds for the video export format
-        self.min_x_videoexport = self.detection_bounds[0][3][0] - self.settings['margins_video_export']
-        self.max_x_videoexport = self.detection_bounds[0][2][0] + self.settings['margins_video_export']
-
-        # Get video properties (for video export)
-        self.frame_width = int(self.max_x_videoexport - self.min_x_videoexport)
-        self.frame_height = int(self.frame.shape[0])
-        self.fps = self.settings['tracking_camera_fps']
-
-        # Define the codec and create VideoWriter object
-        self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.output_video_path = "videos/current_tracking_video_lane_" + str(self.lane_number) + ".mp4"
-        self.out = cv2.VideoWriter(self.output_video_path, self.fourcc, self.fps, (self.frame_width, self.frame_height))
-
         # Define the VideoWriter for the debugging video if necessary
         if self.settings['show_debug_image']:
             self.output_debug_video_path = "videos/debug_new_lane_" + str(self.lane_number) + ".mp4"
-            self.debug_out = cv2.VideoWriter(self.output_debug_video_path, self.fourcc, self.fps, (self.frame_width, self.frame_height))
+            frame_height, frame_width = self.frame.shape[:2]
+            self.debug_out = cv2.VideoWriter(self.output_debug_video_path, cv2.VideoWriter_fourcc(*'mp4v'), 20, (frame_width, frame_height))
 
         # Define a variable to hold the calculated ball speed
         self.ball_speed = None
@@ -304,23 +260,24 @@ class TrackVideo():
         # Define a variable to hold the last frame
         self.last_frame = None
 
-    def TrackFrame(self, frame):
+    def TrackFrame(self, binary, frame):
         # Store the last frame for later recall showing the values (before drawing all centers on the frame, because they should not show in last_frame)
-        self.last_frame = frame.copy()
-
+        self.frame = frame
+        self.last_frame = self.frame.copy()
+        self.binary = binary
+        
         # Detect the ball
-        self.DetectBall(frame, self.blurred_reference)
-
+        self.DetectBall(self.binary)
         # Write the debugging frame if enabled
         if self.settings['show_debug_image']:
             # Convert the grayscale debug_frame to a three channel color frame and write it to the video
             self.debug_out.write(cv2.cvtColor(self.debug_frame, cv2.COLOR_GRAY2BGR))
 
         # Crop the frame for export
-        cropped_frame = frame[:, self.min_x_videoexport:self.max_x_videoexport]
+        cropped_frame = self.frame[:, self.min_x_videoexport:self.max_x_videoexport]
 
         # Write the frame to the video
-        self.out.write(cropped_frame)
+        signal_router.finalized_tracked_frame.emit(cropped_frame)
 
         # Check for how many consecutive frames no center (circle) was detected and if a new one was detected, reset the counter
         if len(self.centerlist) == self.centerlist_length:
@@ -361,14 +318,12 @@ class TrackVideo():
             with open('ball_tracking_data_lane_' + str(self.lane_number) +'.json', 'w') as f:
                 json.dump(tracking_data, f)
 
-            self.out.release()
-            shutil.copy(self.output_video_path, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
-
             if self.settings['show_debug_image']:
                 self.debug_out.release()
                 shutil.copy(self.output_debug_video_path, "videos/debugging_video_lane_" + str(self.lane_number) + ".mp4")
             # Emit a Tracking failed signal
             signal_router.tracking_unsuccessful.emit()
+
             return None
 
         ################
@@ -561,13 +516,8 @@ class TrackVideo():
         # Write the static image as the last frame with calculated values
         cv2.imwrite('videos/tracked_new_' + str(self.lane_number) + '.png', cropped_last_frame)
 
-        # Write the last frame multiple times for 0.3 seconds at the end of the video
-        for _ in range(round(self.fps * 0.3)):
-            self.out.write(cropped_last_frame)
-
-        # Release the video writer
-        self.out.release()
-        shutil.copy(self.output_video_path, "videos/tracked_new_" + str(self.lane_number) + ".mp4")
+        # Send the last frame to be written at the end of the video
+        signal_router.finalized_tracked_frame.emit(cropped_last_frame)
 
         if self.settings['show_debug_image']:
             self.debug_out.release()

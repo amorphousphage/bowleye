@@ -527,51 +527,34 @@ class SettingsTab(QWidget):
             tab_layout.addLayout(self.pins_flipped_label, 6, 0)
             tab_layout.addWidget(self.pins_flipped_item, 6, 1)
 
-
-            self.recorder_frame_rate_label = CreateLabelWithTip("Tracking Camera Frame Rate", "Set the frame rate with which the recorder should check for the ball detection")
-            tab_layout.addLayout(self.recorder_frame_rate_label, 7, 0)
-            self.recorder_frame_rate_item = QSpinBox()
-            self.recorder_frame_rate_item.setMinimum(5)
-            self.recorder_frame_rate_item.setMaximum(25)
-            self.recorder_frame_rate_item.setValue(settings['Recorder'].get('recorder_frame_rate'))
-            tab_layout.addWidget(self.recorder_frame_rate_item, 7, 1)
-
-            self.pins_frame_rate_label = CreateLabelWithTip("Pin Camera Frame Rate", "Set the frame rate with which the recorder should run the camera in front of the pins")
-            tab_layout.addLayout(self.pins_frame_rate_label, 8, 0)
-            self.pins_frame_rate_item = QSpinBox()
-            self.pins_frame_rate_item.setMinimum(25)
-            self.pins_frame_rate_item.setMaximum(60)
-            self.pins_frame_rate_item.setValue(settings['Recorder'].get('pins_frame_rate'))
-            tab_layout.addWidget(self.pins_frame_rate_item, 8, 1)
-
-            tab_layout.addItem(QSpacerItem(spacer_distance, spacer_distance), 9, 1)
+            tab_layout.addItem(QSpacerItem(spacer_distance, spacer_distance), 7, 1)
 
             self.recorder_settings_title = QLabel("<b> Recorder Software settings </b>")
-            tab_layout.addWidget(self.recorder_settings_title, 10, 0)
+            tab_layout.addWidget(self.recorder_settings_title, 8, 0)
 
             self.recorder_detection_bounds_start_button = CreateButtonWithTip("Select Detection Bounds to Start Recording", "Draw the area where the software should detect the ball to start the recording", lambda: self.DefineBounds("recorder_start_bounds"))
             self.recorder_start_bounds_str = settings['Recorder'].get('recorder_start_bounds')
-            tab_layout.addLayout(self.recorder_detection_bounds_start_button, 11, 0)
+            tab_layout.addLayout(self.recorder_detection_bounds_start_button, 9, 0)
 
             self.recorder_detection_bounds_end_button = CreateButtonWithTip("Select Detection Bounds to End Recording", "Draw the area where the software should detect the ball to trigger the finalizing of the recording", lambda: self.DefineBounds("recorder_end_bounds"))
             self.recorder_end_bounds_str = settings['Recorder'].get('recorder_end_bounds')
-            tab_layout.addLayout(self.recorder_detection_bounds_end_button, 12, 0)
+            tab_layout.addLayout(self.recorder_detection_bounds_end_button, 10, 0)
 
             self.export_video_buffer_label = CreateLabelWithTip("Export Video Buffer", "Set the max amount of seconds of exported to a video. This is the maximal length of an exported video")
             self.export_video_buffer_item = QSpinBox()
             self.export_video_buffer_item.setMinimum(5)
             self.export_video_buffer_item.setMaximum(30)
             self.export_video_buffer_item.setValue(settings['Recorder'].get('export_video_buffer'))
-            tab_layout.addLayout(self.export_video_buffer_label, 13, 0)
-            tab_layout.addWidget(self.export_video_buffer_item, 13, 1)
+            tab_layout.addLayout(self.export_video_buffer_label, 11, 0)
+            tab_layout.addWidget(self.export_video_buffer_item, 11, 1)
 
             self.reference_frame_distance_label = CreateLabelWithTip("Reference Frame Distance", "The software uses a reference frame (without the ball) for detection. Select how many frames before the first detected ball this frame should be recorded")
             self.reference_frame_distance_item = QSpinBox()
             self.reference_frame_distance_item.setMinimum(5)
             self.reference_frame_distance_item.setMaximum(60)
             self.reference_frame_distance_item.setValue(settings['Recorder'].get('reference_frame_distance'))
-            tab_layout.addLayout(self.reference_frame_distance_label, 14, 0)
-            tab_layout.addWidget(self.reference_frame_distance_item, 14, 1)
+            tab_layout.addLayout(self.reference_frame_distance_label, 12, 0)
+            tab_layout.addWidget(self.reference_frame_distance_item, 12, 1)
 
             self.time_before_detection_label = CreateLabelWithTip("Time Recorded Before Shot", "Define how many seconds should be in the final tracking video before the ball is first detected")
             self.time_before_detection_item = QDoubleSpinBox()
@@ -580,8 +563,8 @@ class SettingsTab(QWidget):
             self.time_before_detection_item.setSingleStep(0.1)
             self.time_before_detection_item.setDecimals(1)
             self.time_before_detection_item.setValue(settings['Recorder'].get('time_before_detection'))
-            tab_layout.addLayout(self.time_before_detection_label, 15, 0)
-            tab_layout.addWidget(self.time_before_detection_item, 15, 1)
+            tab_layout.addLayout(self.time_before_detection_label, 13, 0)
+            tab_layout.addWidget(self.time_before_detection_item, 13, 1)
 
             self.time_after_shot_label = CreateLabelWithTip("Time Recorded After Shot", "Define how many seconds should be in the videos after the ball enters the pins")
             self.time_after_shot_item = QDoubleSpinBox()
@@ -590,16 +573,16 @@ class SettingsTab(QWidget):
             self.time_after_shot_item.setSingleStep(0.1)
             self.time_after_shot_item.setDecimals(1)
             self.time_after_shot_item.setValue(settings['Recorder'].get('time_after_shot'))
-            tab_layout.addLayout(self.time_after_shot_label, 16, 0)
-            tab_layout.addWidget(self.time_after_shot_item, 16, 1)
+            tab_layout.addLayout(self.time_after_shot_label, 14, 0)
+            tab_layout.addWidget(self.time_after_shot_item, 14, 1)
 
             self.detection_threshold_label = CreateLabelWithTip("Detection Threshold", "Define how many circle must be detected to start/finish recording within each defined Detection Bounds")
             self.detection_threshold_item = QSpinBox()
             self.detection_threshold_item.setMinimum(1)
             self.detection_threshold_item.setMaximum(10)
             self.detection_threshold_item.setValue(settings['Recorder'].get('detection_threshold'))
-            tab_layout.addLayout(self.detection_threshold_label, 17, 0)
-            tab_layout.addWidget(self.detection_threshold_item, 17, 1)
+            tab_layout.addLayout(self.detection_threshold_label, 15, 0)
+            tab_layout.addWidget(self.detection_threshold_item, 15, 1)
 
         # Set the GUI elements for the tab "Ball Detection"
         elif setting == "Ball Detection":
@@ -681,14 +664,14 @@ class SettingsTab(QWidget):
             self.debug_image_title = QLabel("<b>Debugging Image</b>")
             tab_layout.addWidget(self.debug_image_title, 13, 0)
 
-            self.toggle_debugging_image_label = CreateLabelWithTip("Save Debugging Image Video", "Save a debugging video showing the images, which the program uses for Ball detection")
+            self.toggle_debugging_image_label = CreateLabelWithTip("Show and Save Debugging Image Video", "Show a live view of and save a debugging video showing the images, which the program uses for Ball detection")
             self.toggle_debugging_image_item = QComboBox()
             self.toggle_debugging_image_item.addItems(["Yes", "No"])
             self.toggle_debugging_image_item.setCurrentText(str(settings['Ball Detection'].get('show_debugging_image')))
             tab_layout.addLayout(self.toggle_debugging_image_label, 14, 0)
             tab_layout.addWidget(self.toggle_debugging_image_item, 14, 1)
 
-            self.change_debugging_image_label = CreateLabelWithTip("Set Debugging Image Type", "Choose between the Image Showing the Difference to the Reference or the processed binary image")
+            self.change_debugging_image_label = CreateLabelWithTip("Set Debugging Image Type", "Choose between the Image Showing the Difference to the Reference or the processed binary image (for live view only)")
             self.change_debugging_image_item = QComboBox()
             self.change_debugging_image_item.addItems(["Binary", "Difference only"])
             self.change_debugging_image_item.setCurrentText(str(settings['Ball Detection'].get('debugging_image_type')))
@@ -849,14 +832,14 @@ class SettingsTab(QWidget):
         # Set the GUI elements for the tab "Pin Scorer"
         elif setting == "Pin Scorer":
 
-            self.time_pin_reading_after_start_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
-                                                                        "Select how many frames should be recorded since the pin camera started before the score should be read")
-            self.time_pin_reading_after_start_item = QSpinBox()
-            self.time_pin_reading_after_start_item.setMinimum(10)
-            self.time_pin_reading_after_start_item.setMaximum(200)
-            self.time_pin_reading_after_start_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_start'))
-            tab_layout.addLayout(self.time_pin_reading_after_start_label, 1, 0)
-            tab_layout.addWidget(self.time_pin_reading_after_start_item, 1, 1)
+            self.time_pin_reading_after_sweeper_label = CreateLabelWithTip("How many frames should pass before the pin score is read?",
+                                                                        "Select how many frames should be recorded since the sweeper came down before the score should be read")
+            self.time_pin_reading_after_sweeper_item = QSpinBox()
+            self.time_pin_reading_after_sweeper_item.setMinimum(2)
+            self.time_pin_reading_after_sweeper_item.setMaximum(50)
+            self.time_pin_reading_after_sweeper_item.setValue(settings['Pin Scorer'].get('time_pin_reading_after_sweeper'))
+            tab_layout.addLayout(self.time_pin_reading_after_sweeper_label, 1, 0)
+            tab_layout.addWidget(self.time_pin_reading_after_sweeper_item, 1, 1)
 
             self.set_pin_positions_button = CreateButtonWithTip(
                 "Define Pin Positions",
@@ -890,8 +873,6 @@ class SettingsTab(QWidget):
                 'pins_flipped': self.pins_flipped_item.currentText(),
                 'recorder_start_bounds': self.recorder_start_bounds_str,
                 'recorder_end_bounds': self.recorder_end_bounds_str,
-                'recorder_frame_rate': self.recorder_frame_rate_item.value(),
-                'pins_frame_rate': self.pins_frame_rate_item.value(),
                 'export_video_buffer': self.export_video_buffer_item.value(),
                 'reference_frame_distance': self.reference_frame_distance_item.value(),
                 'time_before_detection': self.time_before_detection_item.value(),
@@ -931,7 +912,7 @@ class SettingsTab(QWidget):
             },
 
             'Pin Scorer': {
-                'time_pin_reading_after_start': self.time_pin_reading_after_start_item.value(),
+                'time_pin_reading_after_sweeper': self.time_pin_reading_after_sweeper_item.value(),
                 'pin_coordinates': self.pin_coordinates
             }
         }
@@ -998,9 +979,8 @@ class SettingsTab(QWidget):
         frame = self.ReadCameraImage(camera)
 
         # Display the frame in a window
-        cv2.namedWindow("Testing " + camera, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Testing " + camera, 1800, 900)
         cv2.imshow("Testing " + camera, frame)
+        cv2.waitKey(1)
 
 
     # Function to define detection boundaries by drawing a trapezoid on the first frame
@@ -1194,8 +1174,9 @@ class SettingsTab(QWidget):
 
         # Create a window and set mouse callback function
         cv2.namedWindow("Define Arrow Template", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Define Arrow Template", 1800, 900)
         cv2.imshow("Define Arrow Template", frame_copy)
+        cv2.resizeWindow("Define Arrow Template", 1800, 900)
+        cv2.waitKey(1)
         cv2.setMouseCallback("Define Arrow Template", MouseCallback)
 
         # Wait until the window is closed by the user

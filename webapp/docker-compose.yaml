@@ -1,0 +1,13 @@
+services:
+  bowleye:
+    build: .
+    container_name: bowleye
+    ports:
+      - "5000:5000"
+    privileged: true
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/video2:/dev/video2"
+      - "/dev/video4:/dev/video4"
+
+    restart: unless-stopped

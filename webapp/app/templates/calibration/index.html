@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Calibration{% endblock %}
+
+{% block content %}
+
+<h1>Calibration</h1>
+
+<div id="controls">
+    <label>Device:
+        <select id="deviceSelect">
+            {% for dev in devices %}
+            <option value="{{ dev }}">{{ dev }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>Mode:
+        <select id="modeSelect">
+            <option value="arrows">Arrows Top and Bottom line</option>
+            <option value="detection_bounds">Detection trapezoid (lane + gutters)</option>
+            <option value="calibration_points">Calibration Points</option>
+            <option value="pins">Pin positions</option>
+        </select>
+    </label>
+
+    <label>
+        <input type="checkbox" id="flipVertical">
+        Flip image vertically
+    </label>
+
+    <button id="loadImageBtn">Load image</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="mode-section" id="pinsControls" style="display:none;">
+    <label>Pin:
+        <select id="pinSelect">
+            <option value="1">Pin 1</option>
+            <option value="2">Pin 2</option>
+            <option value="3">Pin 3</option>
+            <option value="4">Pin 4</option>
+            <option value="5">Pin 5</option>
+            <option value="6">Pin 6</option>
+            <option value="7">Pin 7</option>
+            <option value="8">Pin 8</option>
+            <option value="9">Pin 9</option>
+            <option value="10">Pin 10</option>
+        </select>
+    </label>
+</div>
+
+<div class="mode-section">
+    <button id="resetBtn">Reset current mode</button>
+    <button id="saveBtn">Save (show JSON)</button>
+</div>
+
+<h3>Calibration JSON</h3>
+<pre id="output"></pre>
+
+<script src="{{ url_for('static', filename='js/calibration.js') }}"></script>
+
+{% endblock %}

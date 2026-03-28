@@ -1,0 +1,76 @@
+/* Global colors */
+:root {
+    --accent-light: #bf8989;
+    --accent-dark: #bd2829;
+    --text-light: #ffffff;
+    --bg-dark: #000000;
+}
+
+/* Reset */
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-dark);
+    color: var(--text-light);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Header */
+.app-header {
+    width: 100%;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--accent-light), var(--accent-dark));
+    color: var(--text-light);
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Main content */
+.app-content {
+    padding: 16px;
+}
+
+/* Buttons */
+button, .btn {
+    background: var(--accent-dark);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    color: var(--text-light);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+button:hover, .btn:hover {
+    background: var(--accent-light);
+}
+
+/* Card layout */
+.card {
+    background: #111;
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 1px solid #222;
+}
+
+/* Images */
+img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+canvas {
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    display: block;
+}
+
+.app-content {
+    overflow-x: auto !important;
+}
+
+

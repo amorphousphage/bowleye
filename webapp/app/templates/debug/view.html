@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Image: {{ name }}{% endblock %}
+
+{% block content %}
+<h2>Image: {{ name }}</h2>
+
+<div class="card" style="position: relative;">
+    <img id="debugImage"
+         src="{{ url_for('debug.debug_image', name=name) }}"
+         alt="Image"
+         style="display: none; max-width: 100%;">
+
+    <div id="placeholder"
+         style="padding: 40px; text-align: center; color: #aaa;">
+        Waiting for first image…
+    </div>
+</div>
+
+<script>
+    const img = document.getElementById("debugImage");
+    const placeholder = document.getElementById("placeholder");
+
+    function refreshImage() {
+        const url = "{{ url_for('debug.debug_image', name=name) }}" + "?_ts=" + Date.now();
+
+        // Try loading the image
+        const testImg = new Image();
+        testImg.onload = () => {
+            // Image exists → show it
+            img.src = url;
+            img.style.display = "block";
+            placeholder.style.display = "none";
+        };
+        testImg.onerror = () => {
+            // Image missing → show placeholder
+            img.style.display = "none";
+            placeholder.style.display = "block";
+        };
+
+        testImg.src = url;
+    }
+
+    setInterval(refreshImage, 200); // 5 FPS
+</script>
+{% endblock %}

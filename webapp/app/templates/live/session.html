@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Live Session{% endblock %}
+
+{% block content %}
+<h1>Live Session</h1>
+
+<!-- ========================= -->
+<!-- 1. Tracking Result (Live) -->
+<!-- ========================= -->
+<div class="card" style="margin-bottom: 20px;">
+    <h2>Tracking Result</h2>
+    <img id="trackingImage"
+         src="/debug/img/tracking-result"
+         alt="Tracking Result"
+         style="max-width: 100%; display: none;">
+
+    <div id="trackingPlaceholder" style="padding: 20px; text-align: center; color: #aaa;">
+        Waiting for tracking result…
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- 2. Collapsible Pin Video  -->
+<!-- ========================= -->
+<div class="card" style="margin-bottom: 20px;">
+    <h2 style="cursor: pointer;" onclick="toggleVideo()">Pin Video ▼</h2>
+
+    <div id="videoContainer" style="display: none;">
+        <video id="pinVideo" width="100%" controls>
+            <!-- Video source will be set dynamically -->
+        </video>
+
+        <div id="videoPlaceholder" style="padding: 20px; text-align: center; color: #aaa;">
+            No video loaded yet.
+        </div>
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- 3. Score Table Skeleton   -->
+<!-- ========================= -->
+<div class="card">
+    <h2>Score Sheet</h2>
+
+    <table class="score-table">
+        <tr>
+            {% for frame in range(1, 11) %}
+                <th>Frame {{ frame }}</th>
+            {% endfor %}
+        </tr>
+
+        <tr>
+            {% for frame in range(1, 10) %}
+                <td>
+                    <div class="rolls">
+                        <span class="roll" id="f{{ frame }}r1"></span>
+                        <span class="roll" id="f{{ frame }}r2"></span>
+                    </div>
+                    <div class="frame-score" id="f{{ frame }}score"></div>
+                </td>
+            {% endfor %}
+
+            <!-- 10th frame (3 rolls) -->
+            <td>
+                <div class="rolls">
+                    <span class="roll" id="f10r1"></span>
+                    <span class="roll" id="f10r2"></span>
+                    <span class="roll" id="f10r3"></span>
+                </div>
+                <div class="frame-score" id="f10score"></div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<script>
+/* ------------------------------
+   1. Tracking Result Refresh
+--------------------------------*/
+function refreshTracking() {
+    const img = document.getElementById("trackingImage");
+    const placeholder = document.getElementById("trackingPlaceholder");
+
+    const url = "/debug/img/tracking-result?_ts=" + Date.now();
+
+    const testImg = new Image();
+    testImg.onload = () => {
+        img.src = url;
+        img.style.display = "block";
+        placeholder.style.display = "none";
+    };
+    testImg.onerror = () => {
+        img.style.display = "none";
+        placeholder.style.display = "block";
+    };
+
+    testImg.src = url;
+}
+
+// For now: refresh at 5 FPS
+setInterval(refreshTracking, 200);
+
+
+/* ------------------------------
+   2. Collapsible Video Container
+--------------------------------*/
+function toggleVideo() {
+    const container = document.getElementById("videoContainer");
+    container.style.display = container.style.display === "none" ? "block" : "none";
+}
+
+/* ------------------------------
+   3. Poplulate Score Table
+--------------------------------*/
+function updateScoreTable() {
+    fetch("/live/game_state")
+        .then(res => res.json())
+        .then(data => {
+            data.frames.forEach(frame => {
+                // Update rolls
+                if (frame.index < 10) {
+                    document.getElementById(`f${frame.index}r1`).textContent =
+                        frame.rolls[0] !== undefined ? frame.rolls[0] : "";
+                    document.getElementById(`f${frame.index}r2`).textContent =
+                        frame.rolls[1] !== undefined ? frame.rolls[1] : "";
+                } else {
+                    // 10th frame (3 rolls)
+                    document.getElementById(`f10r1`).textContent =
+                        frame.rolls[0] !== undefined ? frame.rolls[0] : "";
+                    document.getElementById(`f10r2`).textContent =
+                        frame.rolls[1] !== undefined ? frame.rolls[1] : "";
+                    document.getElementById(`f10r3`).textContent =
+                        frame.rolls[2] !== undefined ? frame.rolls[2] : "";
+                }
+
+                // Update cumulative score
+                const scoreCell = document.getElementById(`f${frame.index}score`);
+                scoreCell.textContent = frame.score !== null ? frame.score : "";
+            });
+        });
+}
+
+// Poll every 1s
+setInterval(updateScoreTable, 1000);
+
+</script>
+
+{% endblock %}

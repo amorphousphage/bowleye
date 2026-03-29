@@ -8,7 +8,7 @@ This software automatically records a video when it detects a bowling ball going
 - The position (of the ball) at the arrows
 - The position (of the ball) at the breakpoint
 - The ball speed
-- The pins that were left standing
+- The pins that fell (webapp is then calculating the score from it)
 - The entry point into the pins (coming soon)
 
 The software will run as a webapp for the players to connect to via their smart phones. There will be player profiles, stats and game overview.
@@ -24,7 +24,7 @@ Pin action videos can also be saved if wanted. (coming soon)
 To be able to run the software you will need at least:
 - 1 Orange Pi 5 (8GB/16GB RAM) (not sure yet if powerful enough in the end)
 - 2 USB Cameras per Lane (Full HD, 30/60 fps is enough)
-- some USB cables (incl. repeaters for long distance) to connect all cameras to the Raspberry Pi (might become wireless before final release)
+- some USB cables (incl. repeaters for long distance) to connect all cameras to the Pi (might become wireless before final release)
 - A Laptop running the BowlEye software (will change before final release)
 
 The software is in very early stages. So far it has been tested on one single lane, but in theory supportes multiple lanes at the same time

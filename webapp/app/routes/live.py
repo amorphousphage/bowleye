@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, send_file, current_app
 from app.services.game_manager import game_manager
+import os
 
 live_bp = Blueprint("live", __name__)
 
@@ -29,3 +30,9 @@ def upload_score():
 @live_bp.route("/game_state")
 def game_state():
     return game_manager.GetGameState()
+
+@live_bp.route("/pin_video")
+def pin_video():
+    full_path = current_app.root_path + "/static/videos/latest_pin_video.mp4"
+    return send_file(full_path, mimetype="video/mp4", as_attachment=False)
+

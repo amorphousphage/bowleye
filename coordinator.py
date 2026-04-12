@@ -1,6 +1,7 @@
 # import used packages
 import numpy as np
 from collections import deque
+import av
 import os
 import cv2
 import requests
@@ -158,8 +159,12 @@ class CoordinatorWorker:
         self.settings['blurred_kernel'] = config.getint('Ball Detection', 'blurred_kernel')
         self.settings['blurred_sigma'] = config.getint('Ball Detection', 'blurred_sigma')
         self.settings['binary_threshold'] = config.getint('Ball Detection', 'binary_threshold')
-        self.settings['min_diameter'] = config.getint('Ball Detection', 'min_diameter')
-        self.settings['max_diameter'] = config.getint('Ball Detection', 'max_diameter')
+        self.lane_width = 65 # inches (lane plus gutter is 60 iches plus 5 for the marking for detection bounds)
+        self.ball_diameter = 8.55 # inches
+        self.ball_diameter_error = 0.2 # 20%
+        self.settings['min_diameter'] = round(((self.settings['detection_bounds'][0][1][0]-self.settings['detection_bounds'][0][0][0]) / self.lane_width * self.ball_diameter * (1 - self.ball_diameter_error))) # distance of detection bounds towards the pins devided by the lane width in inches * ball width in inches * error rate gives approx ball diameter towards the pins
+        self.settings['max_diameter'] = round(((self.settings['detection_bounds'][0][2][0]-self.settings['detection_bounds'][0][3][0]) / self.lane_width * self.ball_diameter * (1 + self.ball_diameter_error))) # distance of detection bounds towards the pins devided by the lane width in inches * ball width in inches * error rate gives approx ball diameter towards the pins
+        print(f"Calculated allowed ball diameter (in pixel) is: {self.settings['min_diameter']} - {self.settings['max_diameter']}")
         self.settings['max_vertical_pixel_difference'] = config.getint('Ball Detection', 'max_vertical_pixel_difference')
         self.settings['max_horizontal_pixel_difference'] = config.getint('Ball Detection', 'max_horizontal_pixel_difference')
         self.settings['show_debugging_image'] = config.get('Ball Detection', 'show_debugging_image')
@@ -568,7 +573,7 @@ class CoordinatorWorker:
             if self.pins_reference_frame is not None:
                 self.pins_reference_frame = pins_frame
             # Add the pins_frame to the export buffer for later export
-            self.pins_video_frame_buffer.append(pins_frame)
+            self.pins_video_frame_buffer.append((pins_frame, time.time()))
 
             # If no sweeper was detected yet, render the difference image for the pins to detect the sweeper
             if not self.sweeper_detected and self.pins_reference_frame is not None:
@@ -609,7 +614,6 @@ class CoordinatorWorker:
         self.pin_video_path = os.path.join('videos', f'pins_new_{self.lane_number}.mp4')
         future_export = self.executor.submit(
             PinsVideoExporter().run,
-            self.settings['fps_pins_camera'],
             self.pins_video_frame_buffer,
             self.pin_video_path
         )
@@ -817,24 +821,51 @@ class ScoreReader:
 
 # Generate a Thread to asynchronously export the Pins Video Buffer
 class PinsVideoExporter:
-    def run(self, fps_pins, pins_buffer, output_path):
-        # Define the variables used
-        self.fps_pins = fps_pins
-        self.pins_buffer = pins_buffer
-        self.output_path = output_path
+    def run(self, pin_video_frames, output_path):
 
-        # Obtain the height and width of the frames to export
-        pins_frame_height, pins_frame_width = self.pins_buffer[0].shape[:2]
+        if len(pin_video_frames) < 2:
+            print("Not enough frames to export video")
+            return
 
-        # Initialize a video writer
-        out_pins = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps_pins, (pins_frame_width, pins_frame_height))
+        # Open output container
+        container = av.open(output_path, mode="w")
 
-        # Export all frames
-        for frame in self.pins_buffer:
-            out_pins.write(frame)
+        # Use H.264 baseline for compatibility
+        stream = container.add_stream("h264", rate=30)  # nominal rate, overridden by PTS
+        stream.width = pin_video_frames[0][0].shape[1]
+        stream.height = pin_video_frames[0][0].shape[0]
+        stream.pix_fmt = "yuv420p"
 
-        # Release the video writer
-        out_pins.release()
-        self.pins_buffer = None
+        # Timebase: 1/1000 means PTS is in milliseconds
+        stream.time_base = av.time_base.TimeBase(1, 1000)
 
-        pass
+        # Export frames with correct timing
+        prev_ts = pin_video_frames[0][1]
+
+        for frame, ts in pin_video_frames:
+            # Compute delta time in ms
+            dt_ms = int((ts - prev_ts) * 1000)
+            if dt_ms < 1:
+                dt_ms = 1  # avoid zero-duration frames
+
+            prev_ts = ts
+
+            # Create video frame
+            video_frame = av.VideoFrame.from_ndarray(frame, format="bgr24")
+
+            # Assign PTS in milliseconds
+            video_frame.pts = dt_ms
+
+            # Encode
+            packet = stream.encode(video_frame)
+            if packet:
+                container.mux(packet)
+
+        # Flush encoder
+        packet = stream.encode(None)
+        if packet:
+            container.mux(packet)
+
+        container.close()
+
+

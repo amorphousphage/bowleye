@@ -74,7 +74,7 @@ class GameManager:
             print("Game is already complete.")
             return
 
-        frame = self.current_frame
+        frame = self.CurrentFrame
         frame.AddShot(fallen_pins)
 
         # Advance frame if needed
@@ -127,7 +127,7 @@ class GameManager:
                 continue
 
             # Strike
-            if frame.is_strike():
+            if frame.IsStrike():
                 idx = roll_pointer[i][0]
                 bonus = 0
                 if idx + 1 < len(all_rolls):
@@ -139,7 +139,7 @@ class GameManager:
                 continue
 
             # Spare
-            if frame.is_spare():
+            if frame.IsSpare():
                 idx = roll_pointer[i][1]  # second roll index
                 bonus = 0
                 if idx + 1 < len(all_rolls):

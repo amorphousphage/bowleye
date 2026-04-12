@@ -159,7 +159,7 @@ class TrackVideo():
         template_width = 150
         template_height = 570
         foul_line_y = 540
-        headpin_y = 80
+        headpin_y = 60
 
         lane_length_m = 18.29
         lane_width_in = 41.875

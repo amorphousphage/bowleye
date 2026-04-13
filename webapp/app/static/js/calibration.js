@@ -119,10 +119,6 @@ function canvasClickHandler(evt) {
     let x = Math.round(displayX * scaleX);
     let y = Math.round(displayY * scaleY);
 
-    if (flipCheckbox.checked) {
-        y = img.naturalHeight - y;
-    }
-
     const mode = modeSelect.value;
 
     // ----------------------------
@@ -185,7 +181,7 @@ function canvasClickHandler(evt) {
         pinCoordinates[pin] = { x, y };
 
         const next = (parseInt(pin) + 1).toString();
-        if (next <= "10") pinSelect.value = next;
+        if (next <= 10) pinSelect.value = next;
     }
 
     draw();
@@ -265,7 +261,8 @@ saveBtn.addEventListener("click", async () => {
                          headpin_left: headpinLeft ? [headpinLeft.x, headpinLeft.y] : null,
                          headpin_right: headpinRight ? [headpinRight.x, headpinRight.y] : null,
                          max_y_arrows_coordinate,
-                         min_y_arrows_coordinate
+                         min_y_arrows_coordinate,
+                         pin_coordinates: pinCoordinates,
     };
 
     // Show formatted output in the UI
@@ -276,7 +273,8 @@ saveBtn.addEventListener("click", async () => {
     `headpin_left = ${JSON.stringify(payload.headpin_left)}\n` +
     `headpin_right = ${JSON.stringify(payload.headpin_right)}\n` +
     `max_y_arrows_coordinate = ${payload.max_y_arrows_coordinate}\n` +
-    `min_y_arrows_coordinate = ${payload.min_y_arrows_coordinate}\n`;
+    `min_y_arrows_coordinate = ${payload.min_y_arrows_coordinate}\n` +
+    `pin_coordinates = ${JSON.stringify(payload.pin_coordinates)}\n`;
 
     try {
         const res = await fetch("/calibration/api/save_calibration", {

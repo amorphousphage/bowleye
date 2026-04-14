@@ -83,215 +83,189 @@
 </div>
 
 <script>
-/* ------------------------------
-   1. Tracking Result Refresh
---------------------------------*/
-function refreshTracking() {
-    const img = document.getElementById("trackingImage");
-    const placeholder = document.getElementById("trackingPlaceholder");
+    /* ------------------------------
+       1. Tracking Result Refresh
+    --------------------------------*/
+    function refreshTracking() {
+        const img = document.getElementById("trackingImage");
+        const placeholder = document.getElementById("trackingPlaceholder");
 
-    const url = "/debug/img/tracking-result?_ts=" + Date.now();
+        const url = "/debug/img/tracking-result?_ts=" + Date.now();
 
-    const testImg = new Image();
-    testImg.onload = () => {
-        img.src = url;
-        img.style.display = "block";
-        placeholder.style.display = "none";
-    };
-    testImg.onerror = () => {
-        img.style.display = "none";
-        placeholder.style.display = "block";
-    };
-
-    testImg.src = url;
-}
-
-// For now: refresh at 5 FPS
-setInterval(refreshTracking, 200);
-
-
-/* ------------------------------
-   2. Collapsible Video Container
---------------------------------*/
-function toggleVideo() {
-    const container = document.getElementById("videoContainer");
-    container.style.display = container.style.display === "none" ? "block" : "none";
-}
-
-/* ------------------------------
-   3. Poplulate Score Table
---------------------------------*/
-function updateScoreTable() {
-    fetch("/live/game_state")
-        .then(res => res.json())
-        .then(data => {
-
-            const frames = data.frames;
-
-            // Flatten all rolls across the game for bonus lookup
-            const allRolls = [];
-            frames.forEach(f => {
-                f.rolls.forEach(r => {
-                    if (r !== undefined && r !== null) {
-                        allRolls.push(r);
-                    }
-                });
-            });
-
-            // Helper: convert numeric roll to bowling symbol
-            function symbolForRoll(frameIndex, rolls, rollIndex) {
-                const r = rolls[rollIndex];
-                if (r === undefined) return "";
-
-                // Strike (first roll OR 10th frame special cases)
-                if (r === 10 && (frameIndex < 10 || rollIndex === 0)) {
-                    return "X";
-                }
-
-                // Spare (only if second roll makes total 10)
-                if (rollIndex === 1 && rolls[0] + rolls[1] === 10) {
-                    return "/";
-                }
-
-                return r.toString();
-            }
-
-            // Helper: count how many bonus rolls are available after this frame
-            function bonusRollsAvailable(frameIndex) {
-                // Count rolls BEFORE this frame
-                let rollsBefore = 0;
-                for (let i = 0; i < frameIndex - 1; i++) {
-                    rollsBefore += frames[i].rolls.length;
-                }
-
-                // Rolls in this frame
-                const currentRollCount = frames[frameIndex - 1].rolls.length;
-
-                // Total rolls up to and including this frame
-                const rollsUpToFrame = rollsBefore + currentRollCount;
-
-                // Bonus rolls = all rolls after this frame
-                return allRolls.length - rollsUpToFrame;
-            }
-
-            frames.forEach(frame => {
-                const idx = frame.index;
-                const rolls = frame.rolls;
-
-                // -----------------------------
-                // 1. Update roll symbols
-                // -----------------------------
-                if (idx < 10) {
-                    document.getElementById(`f${idx}r1`).textContent =
-                        symbolForRoll(idx, rolls, 0);
-
-                    document.getElementById(`f${idx}r2`).textContent =
-                        symbolForRoll(idx, rolls, 1);
-
-                } else {
-                    // 10th frame (3 rolls)
-                    document.getElementById(`f10r1`).textContent =
-                        symbolForRoll(idx, rolls, 0);
-
-                    document.getElementById(`f10r2`).textContent =
-                        symbolForRoll(idx, rolls, 1);
-
-                    document.getElementById(`f10r3`).textContent =
-                        symbolForRoll(idx, rolls, 2);
-                }
-
-                // -----------------------------
-                // 2. Update cumulative score
-                // -----------------------------
-                const scoreCell = document.getElementById(`f${idx}score`);
-
-                if (frame.score === null) {
-                    scoreCell.textContent = "";
-                    scoreCell.style.color = "";
-                    return;
-                }
-
-                scoreCell.textContent = frame.score;
-
-                // -----------------------------
-                // 3. Determine pending bonuses
-                // -----------------------------
-                let pending = false;
-                let color = "";
-
-                if (idx < 10) {
-                    const r1 = rolls[0];
-                    const r2 = rolls[1];
-
-                    const bonusAvailable = bonusRollsAvailable(idx);
-
-                    // STRIKE → needs 2 bonus rolls
-                    if (r1 === 10) {
-                        if (bonusAvailable < 2) {
-                            pending = true;
-                            color = "red";
-                        }
-                    }
-
-                    // SPARE → needs 1 bonus roll
-                    else if (r1 + r2 === 10) {
-                        if (bonusAvailable < 1) {
-                            pending = true;
-                            color = "darkgoldenrod";
-                        }
-                    }
-                }
-
-                scoreCell.style.color = pending ? color : "";
-            });
-        });
-}
-
-/* ------------------------------
-   4. Poplulate Video
---------------------------------*/
-let lastVideoTag = null;  // store last ETag or Last-Modified
-
-function updatePinVideo() {
-    const video = document.getElementById("pinVideo");
-    const placeholder = document.getElementById("videoPlaceholder");
-
-    fetch("/live/pin_video", { method: "HEAD" })
-        .then(res => {
-            if (!res.ok) return;
-
-            const newTag =
-                res.headers.get("ETag") ||
-                res.headers.get("Last-Modified");
-
-            // If no change → do nothing
-            if (newTag === lastVideoTag) return;
-
-            // Update stored tag
-            lastVideoTag = newTag;
-
-            // Load the new video
-            const url = "/live/pin_video?ts=" + Date.now();
-            video.src = url;
-            video.load();
-
-            video.style.display = "block";
+        const testImg = new Image();
+        testImg.onload = () => {
+            img.src = url;
+            img.style.display = "block";
             placeholder.style.display = "none";
+        };
+        testImg.onerror = () => {
+            img.style.display = "none";
+            placeholder.style.display = "block";
+        };
 
-            console.log("New pin video loaded:", newTag);
-        })
-        .catch(() => {});
-}
+        testImg.src = url;
+    }
 
-// Poll every 1 second
-setInterval(updatePinVideo, 1000);
+    setInterval(refreshTracking, 200);
 
-// Change the playback speed of the pin video depending on the dropdown value
-document.getElementById("speedSelect").addEventListener("change", function () {
-    const video = document.getElementById("pinVideo");
-    video.playbackRate = parseFloat(this.value);
+
+    /* ------------------------------
+       2. Collapsible Video Container
+    --------------------------------*/
+    function toggleVideo() {
+        const container = document.getElementById("videoContainer");
+        container.style.display = container.style.display === "none" ? "block" : "none";
+    }
+    window.toggleVideo = toggleVideo; // keep it callable from HTML
+
+
+    /* ------------------------------
+       3. Populate Score Table
+    --------------------------------*/
+    function updateScoreTable() {
+        const url = "/live/game_state?ts=" + Date.now();
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                const frames = data.frames;
+
+                const allRolls = [];
+                frames.forEach(f => {
+                    f.rolls.forEach(r => {
+                        if (r !== undefined && r !== null) {
+                            allRolls.push(r);
+                        }
+                    });
+                });
+
+                function symbolForRoll(frameIndex, rolls, rollIndex) {
+                    const r = rolls[rollIndex];
+                    if (r === undefined) return "";
+
+                    if (r === 10 && (frameIndex < 10 || rollIndex === 0)) {
+                        return "X";
+                    }
+
+                    if (rollIndex === 1 && rolls.length >= 2 && rolls[0] + rolls[1] === 10) {
+                        return "/";
+                    }
+
+                    return r.toString();
+                }
+
+                function bonusRollsAvailable(frameIndex) {
+                    let rollsBefore = 0;
+                    for (let i = 0; i < frameIndex - 1; i++) {
+                        rollsBefore += frames[i].rolls.length;
+                    }
+
+                    const currentRollCount = frames[frameIndex - 1].rolls.length;
+                    const rollsUpToFrame = rollsBefore + currentRollCount;
+
+                    return allRolls.length - rollsUpToFrame;
+                }
+
+                frames.forEach(frame => {
+                    const idx = frame.index;
+                    const rolls = frame.rolls;
+
+                    if (idx < 10) {
+                        document.getElementById(`f${idx}r1`).textContent =
+                            symbolForRoll(idx, rolls, 0);
+
+                        document.getElementById(`f${idx}r2`).textContent =
+                            symbolForRoll(idx, rolls, 1);
+
+                    } else {
+                        document.getElementById(`f10r1`).textContent =
+                            symbolForRoll(idx, rolls, 0);
+
+                        document.getElementById(`f10r2`).textContent =
+                            symbolForRoll(idx, rolls, 1);
+
+                        document.getElementById(`f10r3`).textContent =
+                            symbolForRoll(idx, rolls, 2);
+                    }
+
+                    const scoreCell = document.getElementById(`f${idx}score`);
+
+                    if (frame.score === null) {
+                        scoreCell.textContent = "";
+                        scoreCell.style.color = "";
+                    } else {
+                        scoreCell.textContent = frame.score;
+                    }
+
+                    let pending = false;
+                    let color = "";
+
+                    if (idx < 10) {
+                        const r1 = rolls[0];
+                        const r2 = rolls[1] ?? 0;
+
+                        const bonusAvailable = bonusRollsAvailable(idx);
+
+                        if (r1 === 10) {
+                            if (bonusAvailable < 2) {
+                                pending = true;
+                                color = "red";
+                            }
+                        } else if (rolls.length >= 2 && r1 + r2 === 10) {
+                            if (bonusAvailable < 1) {
+                                pending = true;
+                                color = "darkgoldenrod";
+                            }
+                        }
+                    }
+                    scoreCell.style.color = pending ? color : "";
+                });
+            })
+
+    setInterval(updateScoreTable, 1000);
+
+
+    /* ------------------------------
+       4. Populate Video
+    --------------------------------*/
+    let lastVideoTag = null;
+
+    function updatePinVideo() {
+        const video = document.getElementById("pinVideo");
+        const placeholder = document.getElementById("videoPlaceholder");
+
+        fetch("/live/pin_video", { method: "HEAD" })
+            .then(res => {
+                if (!res.ok) return;
+
+                const newTag =
+                    res.headers.get("ETag") ||
+                    res.headers.get("Last-Modified");
+
+                if (newTag === lastVideoTag) return;
+
+                lastVideoTag = newTag;
+
+                const url = "/live/pin_video?ts=" + Date.now();
+                video.src = url;
+                video.load();
+
+                video.style.display = "block";
+                placeholder.style.display = "none";
+
+                console.log("New pin video loaded:", newTag);
+            })
+            .catch(() => {});
+    }
+
+    setInterval(updatePinVideo, 1000);
+
+    document.getElementById("speedSelect").addEventListener("change", function () {
+        const video = document.getElementById("pinVideo");
+        video.playbackRate = parseFloat(this.value);
+    });
+
 });
-
 </script>
+
 
 {% endblock %}

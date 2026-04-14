@@ -3,6 +3,7 @@ from collections import deque
 import av
 import numpy as np
 import time
+import logging
 
 class CameraRecorder(Thread):
     def __init__(self, settings, buffer, stop_event, is_pins_camera=False):
@@ -33,7 +34,7 @@ class CameraRecorder(Thread):
                 }
             )
         except (OSError, ValueError) as e:
-            print("Camera not readable", f"{'Pins' if self.is_pins_camera else 'Tracking'} Camera could not be opened with PyAV: {e}")
+            logging.exception(f"{'Pins' if self.is_pins_camera else 'Tracking'} Camera could not be opened with PyAV")
             self.running = False
             return
 
@@ -78,17 +79,6 @@ class CameraRecorder(Thread):
 
             except (StopIteration, av.AVError, OSError):
                 continue
-
-            # === FPS tracking ===
-            now = time.time()
-            self.frame_times.append(now)
-
-            if now - self.last_fps_report >= 2.0:  # Report every 2 seconds
-                if len(self.frame_times) >= 2:
-                    elapsed = self.frame_times[-1] - self.frame_times[0]
-                    avg_fps = len(self.frame_times) / elapsed if elapsed > 0 else 0
-                    #print(f"[{self.__class__.__name__}] {'Pins' if self.is_pins_camera else 'Tracking'} FPS: {avg_fps:.2f}")
-                self.last_fps_report = now
 
         self.stop_event.set()
 

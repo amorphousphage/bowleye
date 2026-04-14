@@ -8,9 +8,11 @@ import ast
 import os
 import time
 import shutil
+import logging
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, UnivariateSpline
+from scipy.ndimage import gaussian_filter1d
 from collections import deque
 
 class TrackVideo():
@@ -86,14 +88,14 @@ class TrackVideo():
                 # If the ball is towards the end of the lane, trigger the signal that the shot is ending
                 if self.centerlist[-1][1] - self.settings['detection_bounds'][0][0][1] < self.settings['top_detection_bounds_margin'] and not self.end_triggered:
                     self.ball_near_end_signal("ball near the end detected")
-                    print("end detected")
+                    logging.info("end detected")
                     self.end_triggered = True
             else:
                 self.no_detection_frames += 1
 
             if self.no_detection_frames > 10 and not self.end_triggered:
                 self.ball_near_end_signal("ball near the end detected")
-                print("no frames detected for 10 frames, stopping")
+                logging.info("no frames detected for 10 frames, stopping")
                 self.end_triggered = True
 
         # Return the list of detected circles and the debug_frame
@@ -149,8 +151,8 @@ class TrackVideo():
         # boards: 0 = right gutter, 39 = left gutter
         return (42.0 - lane_x_inches) / (42.0 / 39.0)
 
-    def DrawBallPathImage(self, template_path, ball_positions, output_path):
-        # Load your lane template
+    def DrawBallPathImage(self, template_path, lane_positions):
+        # Load template
         img = cv2.imread(template_path)
         if img is None:
             raise ValueError(f"Could not load template image: {template_path}")
@@ -164,41 +166,46 @@ class TrackVideo():
         lane_length_m = 18.29
         lane_width_in = 41.875
 
-        # Vertical scale
+        # Calculate how many pixel per meter of lane length there are and how many pixel per inch of width there are
         px_per_meter = (foul_line_y - headpin_y) / lane_length_m
-
-        # Horizontal scale
         px_per_inch = template_width / lane_width_in
 
+        # Define a function to convert lane distance to pixels for drawing
         def LaneToPixel(lane_x_inches, lane_y_meters):
-            # Horizontal: left=0in → x=0px, right=42in → x=150px
             x_px = int(lane_x_inches * px_per_inch)
-
-            # Vertical: foul line (0m) at y=539, headpin (18.29m) at y=80
             y_px = int(foul_line_y - lane_y_meters * px_per_meter)
-
             return x_px, y_px
 
-        # Draw the ball path
-        for i in range(1, len(ball_positions)):
-            p1 = ball_positions[i - 1]
-            p2 = ball_positions[i]
+        # Define the skid-hook-roll boundary phases
+        skid_start = self.phase_indices["skid_start"]
+        hook_start = self.phase_indices["hook_start"]
+        hook_end = self.phase_indices["hook_end"]
+        roll_end = self.phase_indices["roll_end"]
 
-            # Convert boards → inches
-            x1_inches = 42 - p1['boards_from_right_gutter'] * (42/39)
-            x2_inches = 42 - p2['boards_from_right_gutter'] * (42/39)
+        # Define colors for the skid-hook-roll phasing
+        COLOR_SKID = (0, 0, 255)        # red
+        COLOR_HOOK = (0, 140, 255)      # dark orange
+        COLOR_ROLL = (19, 69, 139)      # brown
 
-            y1_m = p1['meters_down_lane']
-            y2_m = p2['meters_down_lane']
+        # Draw segments with phase colors
+        for i in range(1, len(lane_positions)):
+            x1, y1 = lane_positions[i - 1]
+            x2, y2 = lane_positions[i]
 
-            pt1 = LaneToPixel(x1_inches, y1_m)
-            pt2 = LaneToPixel(x2_inches, y2_m)
+            pt1 = LaneToPixel(x1, y1)
+            pt2 = LaneToPixel(x2, y2)
 
-            cv2.line(img, pt1, pt2, (0, 0, 255), 2)
+            if i < hook_start:
+                color = COLOR_SKID
+            elif hook_start <= i <= hook_end:
+                color = COLOR_HOOK
+            else:
+                color = COLOR_ROLL
 
-        cv2.imwrite(output_path, img)
+            cv2.line(img, pt1, pt2, color, 3)
 
         return img
+
 
 
     ################################
@@ -318,58 +325,93 @@ class TrackVideo():
 
         ## ~~ Calculate a fitted line through all center points ~~ ##
 
+        ###############################################
+        # 1. Convert centerlist to lane coordinates   #
+        ###############################################
+
         # Convert centerlist to numpy array for easier manipulation to fit a curve through all centers
         center_array = np.array(self.centerlist)
 
-        # Divide center_array into equal subsets for seperate fitting
-        subset_size = len(center_array) // 3
-        subsets = [center_array[i:i + subset_size] for i in range(0, len(center_array), subset_size)]
-
-        # Define a variable to store all fitted points from all three curves
-        complete_fitted_curve_points = []
-
-        # Fit a polynomial to each subset
-        for i in range(len(subsets)):
-            subset = subsets[i]
-            x_subset = subset[:, 0]
-            y_subset = subset[:, 1]
-            coefficients = np.polyfit(x_subset, y_subset, 2) # Fit a quadratic fit to the subset
-            fitted_curve = np.poly1d(coefficients)
-
-            # Generate points for the fitted curve
-            x_fit_subset = np.linspace(min(x_subset), max(x_subset), self.settings['amount_of_points'])
-            y_fit_subset = fitted_curve(x_fit_subset)
-
-            # Combine the points from all the fitted curves
-            points = np.column_stack((x_fit_subset, y_fit_subset))
-            complete_fitted_curve_points.extend(points)
-
-        # Convert the combined points to a numpy array
-        complete_fitted_curve_points = np.array(complete_fitted_curve_points)
-
-        # Sort all points for decreasing (vertical) y-value to allow correct drawing of the curve
-        sorted_points = complete_fitted_curve_points[np.argsort(complete_fitted_curve_points[:, 1])[::-1]]
-
-        # Smooth the combined curve
-        smoothed_curve = self.SmoothCurve(sorted_points)
-
-        # Convert smoothed curve to lane coordinates
-        lane_positions = []  # list of (lane_x_inches, lane_y_meters)
-        for (px, py) in smoothed_curve:
+        # Convert the pixel coordinates to Lane Coordinates
+        lane_points = []
+        for (px, py) in center_array:
             lx, ly = self.PixelToLaneCoordinates(px, py)
-            lane_positions.append((lx, ly))
+            lane_points.append((lx, ly))
+
+        lane_points = np.array(lane_points)
+
+        # Sort by increasing y
+        lane_points = lane_points[np.argsort(lane_points[:, 1])]
+
+        ys = lane_points[:, 1]   # lane y in meters
+        xs = lane_points[:, 0]   # lane x in inches
+
+        ###############################################
+        # 2. Fit a smoothing spline x(y)              #
+        ###############################################
+
+        # Smoothing factor s controls how smooth the curve is.
+        smoothing = 2.0
+
+        spline = UnivariateSpline(ys, xs, s=smoothing)
+
+        ###############################################
+        # 3. Evaluate the spline densely for drawing  #
+        ###############################################
+
+        y_dense = np.linspace(ys.min(), ys.max(), self.settings['amount_of_points'])
+        x_dense = spline(y_dense)
+
+        # Combine into lane_positions list
+        lane_positions = list(zip(x_dense, y_dense))
+
+        ###############################################
+        # 4. Compute derivatives for phase detection  #
+        ###############################################
+
+        dx_dy  = spline.derivative(1)(y_dense)
+        d2x_dy2 = spline.derivative(2)(y_dense)
+
+        # Curvature proxy (absolute second derivative)
+        curv = np.abs(d2x_dy2)
+
+        # Optional smoothing to avoid jitter
+        curv_smooth = gaussian_filter1d(curv, sigma=2)
+
+        max_curv = np.max(curv_smooth)
+        if max_curv < 1e-6:
+            # Straight ball fallback
+            hook_start_idx = 0
+            hook_end_idx = len(curv_smooth) - 1
+        else:
+            skid_threshold = 0.20 * max_curv
+            roll_threshold = 0.20 * max_curv
+
+            # Hook start = first time curvature rises above threshold
+            hook_start_idx = int(np.argmax(curv_smooth > skid_threshold))
+
+            # Hook end = last time curvature is above threshold
+            hook_end_idx = len(curv_smooth) - int(np.argmax(curv_smooth[::-1] > roll_threshold)) - 1
+
+        # Store for drawing later
+        self.phase_indices = {
+            "skid_start": 0,
+            "hook_start": hook_start_idx,
+            "hook_end": hook_end_idx,
+            "roll_end": len(y_dense) - 1
+        }
 
         # --- Position at arrows (y ≈ 4.57 m) ---
         target_y_arrows = 4.57 #replace later with settings value
         idx_arrows = int(np.argmin([abs(ly - target_y_arrows) for (_, ly) in lane_positions]))
         lane_x_at_arrows = lane_positions[idx_arrows][0]
-        ball_pos_at_arrows = round(self.InchesToBoardsFromRight(lane_x_at_arrows) * 2) / 2
+        ball_pos_at_arrows = round(self.InchesToBoardsFromRight(lane_x_at_arrows),1)
 
         # --- Position at foul line (y = 0 m) via regression in lane space ---
         ys = np.array([ly for (_, ly) in lane_positions])
         xs = np.array([lx for (lx, _) in lane_positions])
 
-        # Use only points up to arrows for laydown estimation (optional)
+        # Use only points up to arrows for laydown estimation and launch angle calculation
         mask_up_to_arrows = ys <= target_y_arrows
         if np.count_nonzero(mask_up_to_arrows) >= 2:
             ys_fit = ys[mask_up_to_arrows]
@@ -378,9 +420,12 @@ class TrackVideo():
             # Fit x = m*y + c
             m, c = np.polyfit(ys_fit, xs_fit, 1)
             x_at_foul = c  # y = 0 → x = c
-            board_lay_down = round(self.InchesToBoardsFromRight(x_at_foul) * 2) / 2
+            board_lay_down = round(self.InchesToBoardsFromRight(x_at_foul), 1)
+            launch_slope = m
+            launch_angle_deg = np.degrees(np.arctan(launch_slope))
         else:
             board_lay_down = "n/a"
+            launch_angle_deg = "n/a"
 
         # --- Breakpoint: minimal distance to right gutter in boards ---
         boards_from_right_list = [self.InchesToBoardsFromRight(lx) for (lx, _) in lane_positions]
@@ -393,14 +438,9 @@ class TrackVideo():
         elif min_distance_from_gutter < -0.5:
             min_distance_from_gutter = "Gutter"
 
-        # --- Build ball_positions list for JSON / drawing ---
-        ball_positions = []
-        for (lx, ly) in lane_positions:
-            boards_from_right = self.InchesToBoardsFromRight(lx)
-            ball_positions.append({
-                'boards_from_right_gutter': boards_from_right,
-                'meters_down_lane': ly
-            })
+        # Calculate Entry angle (near the pins)########
+        entry_slope = dx_dy[-5]  # stable estimate
+        entry_angle_deg = np.degrees(np.arctan(entry_slope))
 
         # --- Tracking data dict ---
         if self.ball_speed is None:
@@ -410,20 +450,25 @@ class TrackVideo():
             'ball_speed': self.ball_speed,
             'position_at_foul_line': board_lay_down,
             'position_at_arrows': ball_pos_at_arrows,
-            'position_at_breakpoint': min_distance_from_gutter,
-            'ball_positions': ball_positions
+            'position_at_breakpoint': round(min_distance_from_gutter, 1) if isinstance(min_distance_from_gutter, (int,float)) else min_distance_from_gutter,
+            'lane_positions': lane_positions,
+            'launch_angle': round(launch_angle_deg, 1) if isinstance(launch_angle_deg, (int, float)) else launch_angle_deg,
+            'entry_angle': round(entry_angle_deg, 1) if isinstance(entry_angle_deg, (int, float)) else entry_angle_deg,
             }
 
-        # Debug print tracking data
-        print("--- Tracking Data ---")
-        print(f"Ball Speed: {self.ball_speed} km/h")
-        print(f"Position @ Foul Line: {board_lay_down}")
-        print(f"Position @ Arrows: {ball_pos_at_arrows}")
-        print(f"Position @ Breakpoint: {min_distance_from_gutter}")
-        print("---------------------")
+        logging.info(
+            "\n--- Tracking Data ---\n"
+            f"Ball Speed: {self.tracking_data['ball_speed']} km/h\n"
+            f"Position @ Foul Line: {self.tracking_data['position_at_foul_line']}\n"
+            f"Position @ Arrows: {self.tracking_data['position_at_arrows']}\n"
+            f"Position @ Breakpoint: {self.tracking_data['position_at_breakpoint']}\n"
+            f"Launch Angle: {self.tracking_data['launch_angle']}\n"
+            f"Entry Angle: {self.tracking_data['entry_angle']}\n"
+            "---------------------"
+        )
 
 
         # Draw the calculations on the frame
-        self.tracking_image = self.DrawBallPathImage(template_path="templates/lane.png", ball_positions=self.tracking_data['ball_positions'], output_path="track.png")
+        self.tracking_image = self.DrawBallPathImage(template_path="templates/lane.png", lane_positions=lane_positions)
 
         return self.tracking_image

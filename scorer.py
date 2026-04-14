@@ -1,4 +1,5 @@
 import cv2
+import logging
 import numpy as np
 from skimage.metrics import structural_similarity as compare_ssim
 

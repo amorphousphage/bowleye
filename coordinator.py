@@ -9,6 +9,7 @@ import configparser
 import ast
 import time
 import threading
+import logging
 from threading import Lock, Event, Thread
 from ball_tracker import TrackVideo
 from scorer import PinScorer
@@ -17,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from enum import Enum, auto
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+from fractions import Fraction
 
 # Define the states of the coordinator depending on the activity
 class State(Enum):
@@ -128,7 +130,7 @@ class CoordinatorWorker:
         if os.path.exists(config_file):
             config.read(config_file)
         else:
-            print(f"No settings for lane {self.lane_number} were found. Please go to settings and choose the lane to autogenerate the settings file. Afterwards reboot the program.")
+            logging.error(f"No settings for lane {self.lane_number} were found. Please go to settings and choose the lane to autogenerate the settings file. Afterwards reboot the program.")
             return False
         # Populate the settings dictionary
         # Recorder settings
@@ -164,7 +166,7 @@ class CoordinatorWorker:
         self.ball_diameter_error = 0.2 # 20%
         self.settings['min_diameter'] = round(((self.settings['detection_bounds'][0][1][0]-self.settings['detection_bounds'][0][0][0]) / self.lane_width * self.ball_diameter * (1 - self.ball_diameter_error))) # distance of detection bounds towards the pins devided by the lane width in inches * ball width in inches * error rate gives approx ball diameter towards the pins
         self.settings['max_diameter'] = round(((self.settings['detection_bounds'][0][2][0]-self.settings['detection_bounds'][0][3][0]) / self.lane_width * self.ball_diameter * (1 + self.ball_diameter_error))) # distance of detection bounds towards the pins devided by the lane width in inches * ball width in inches * error rate gives approx ball diameter towards the pins
-        print(f"Calculated allowed ball diameter (in pixel) is: {self.settings['min_diameter']} - {self.settings['max_diameter']}")
+        logging.info(f"[CoordinatorWorker] Calculated allowed ball diameter (in pixel) is: {self.settings['min_diameter']} - {self.settings['max_diameter']}")
         self.settings['max_vertical_pixel_difference'] = config.getint('Ball Detection', 'max_vertical_pixel_difference')
         self.settings['max_horizontal_pixel_difference'] = config.getint('Ball Detection', 'max_horizontal_pixel_difference')
         self.settings['show_debugging_image'] = config.get('Ball Detection', 'show_debugging_image')
@@ -432,15 +434,15 @@ class CoordinatorWorker:
                 if (size_check and glitch_check and (not self.centerlist or bottom_y < self.centerlist[-1][1]) and (not self.diameterlist or size_change_check)):
                     self.centerlist.append(ball_bottom_center)
                     self.diameterlist.append(max_diameter)
-                    print("Ball detected")
-                    print(f"size check: {size_check}")
-                    print(f"glitch check: {glitch_check}, aspect_ratio: {round(aspect_ratio, 1)}, horizontal: {max_diameter}, vertical: {height_candidate}")
+                    logging.info("Ball detected")
+                    logging.debug(f"size check: {size_check}")
+                    logging.debug(f"glitch check: {glitch_check}, aspect_ratio: {round(aspect_ratio, 1)}, horizontal: {max_diameter}, vertical: {height_candidate}")
                 else:
-                    print(f"potential ball detected, but")
-                    print("size_check: ", size_check)
-                    print("glitch_check: ", glitch_check)
+                    logging.debug(f"potential ball detected, but")
+                    logging.debug("size_check: ", size_check)
+                    logging.debug("glitch_check: ", glitch_check)
                     if self.diameterlist:
-                        print("size_change_check: ", size_change_check)
+                        logging.debug("size_change_check: ", size_change_check)
 
     # Function to detect the sweeper in the pins camera
     def DetectSweeper(self, binary):
@@ -473,8 +475,8 @@ class CoordinatorWorker:
         if self.sweeper_count >= 3 and not self.sweeper_detected:
             self.sweeper_detected = True
             self.time_sweeper_detected = time.time()
-            # For debugging, print if a sweeper was detected
-            print("Sweeper down detected")
+            # For debugging, log if a sweeper was detected
+            logging.info("Sweeper down detected")
             ball_near_end_signal("Ball near the end detected")
 
     # --- Handler Functions to control the state of the coordinator ---
@@ -596,7 +598,7 @@ class CoordinatorWorker:
         elif self.cut_trigger_time is not None and time.time() - self.cut_trigger_time >= self.settings['time_after_shot']:
             # If no sweeper was detected, take the last frame as reading frame for the pin scoring
             if self.sweeper_detected == False or self.pin_scorer_reading_frame is None:
-                print("No sweeper was detected during this shot")
+                logging.info("No sweeper was detected during this shot")
 
                 # Obtain the reading frame as the current pin camera frame
                 self.pin_scorer_reading_frame = self.pins_camera_buffer.get()
@@ -630,7 +632,8 @@ class CoordinatorWorker:
 
         # Perform all calculations and visualizations on the tracked frames
         self.latest_tracking = self.ball_tracker.CalculateTrackingData()
-        self.UploadImageToWebServer("tracking-result", self.latest_tracking.copy())
+        if self.latest_tracking is not None:
+            self.UploadImageToWebServer("tracking-result", self.latest_tracking.copy())
 
         # Trigger the event loop to wait for the Pin Video Export Completion before starting to monitor for a new shot
         self.status_callback("Waiting for Pins Video Export to finish...")
@@ -660,10 +663,10 @@ class CoordinatorWorker:
 
         # Reinitialize the cameras
         if not self.InitializeCameras():
-            print("Reinitializing Cameras unsuccessful!")
+            logging.error("Reinitializing Cameras unsuccessful!")
             return
         else:
-            print("[CoordinatorWorker] Cameras reinitialized")
+            logging.info("Cameras reinitialized")
 
         # Restart the camera workers (as defined in the InitializeCameras)
         self.executor.submit(self.tracking_camera_worker.run)
@@ -700,7 +703,7 @@ class CoordinatorWorker:
                     timeout=2
                 )
         except Exception as e:
-            print("Video upload failed:", e)
+            logging.exception("Video upload failed")
 
 
     # Function to execute once the coordinator is activated
@@ -708,24 +711,24 @@ class CoordinatorWorker:
 
         # Obtain the settings
         if not self.InitializeSettings():
-            print("Initializing Settings unsuccessful!")
+            logging.error("Initializing Settings unsuccessful!")
             return
         else:
-            print("[CoordinatorWorker] Settings initialized")
+            logging.info("Settings initialized")
 
         # Initialize the buffers storring various camera frames
         if not self.InitResetBuffers("init"):
-            print("Buffers could not be initialized")
+            logging.error("Buffers could not be initialized")
             return
         else:
-            print("[CoordinatorWorker] Buffers initialized")
+            logging.info("[CoordinatorWorker] Buffers initialized")
 
         # Initialize the cameras
         if not self.InitializeCameras():
-            print("Initializing Cameras unsuccessful!")
+            logging.error("Initializing Cameras unsuccessful!")
             return
         else:
-            print("[CoordinatorWorker] Cameras initialized")
+            logging.info("[CoordinatorWorker] Cameras initialized")
 
         # Set the various Coordinator Variables
         self.SetCoordinatorVariables()
@@ -758,15 +761,14 @@ class CoordinatorWorker:
             # Obtain the current frame in the tracking camera buffer
             frame = self.tracking_camera_buffer.get()
             if frame is None:
-                #print("frame is none")
                 continue
 
             if frame.shape != self.expected_tracking_frame_shape:
-                print("frame has an invalid shape")
+                logging.error("frame has an invalid shape")
                 continue
 
             if np.std(frame) < 2:
-                print("frame is not valid")
+                logging.error("frame is not valid")
                 continue
 
             # Check if the preshot buffer is not locked (ball was not yet detected and the preshot frame buffer should still be overwritten), then obtain and append the frame
@@ -779,7 +781,7 @@ class CoordinatorWorker:
             if handler:
                 handler(frame)
             else:
-                print(f"No handler for state {self.state}")
+                logging.error(f"No handler for state {self.state}")
 
 
     # Function to stop the recorder loop
@@ -815,7 +817,7 @@ class ScoreReader:
         )
 
         # Print the result
-        print(f"The Score is {len(fallen_pins)}. The Pins that fell are: ", fallen_pins)
+        logging.info(f"The Score is {len(fallen_pins)}. The Pins that fell are: {fallen_pins}")
 
         pass
 
@@ -824,48 +826,59 @@ class PinsVideoExporter:
     def run(self, pin_video_frames, output_path):
 
         if len(pin_video_frames) < 2:
-            print("Not enough frames to export video")
+            logging.info("Not enough frames to export video")
             return
+
+        # Ensure folder exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # --- Compute actual FPS from timestamps ---
+        first_ts = pin_video_frames[0][1]
+        last_ts = pin_video_frames[-1][1]
+        duration = last_ts - first_ts
+
+        if duration <= 0:
+            fps = 30
+        else:
+            fps = round(len(pin_video_frames) / duration)
+
+        fps = max(5, min(fps, 60))  # clamp to sane range
+        logging.info(f"Exporting pin video at {fps:.2f} fps")
 
         # Open output container
         container = av.open(output_path, mode="w")
 
-        # Use H.264 baseline for compatibility
-        stream = container.add_stream("h264", rate=30)  # nominal rate, overridden by PTS
-        stream.width = pin_video_frames[0][0].shape[1]
-        stream.height = pin_video_frames[0][0].shape[0]
-        stream.pix_fmt = "yuv420p"
+        # Use libx264
+        stream = container.add_stream("libx264", rate=fps)
 
-        # Timebase: 1/1000 means PTS is in milliseconds
-        stream.time_base = av.time_base.TimeBase(1, 1000)
+        height = pin_video_frames[0][0].shape[0]
+        width = pin_video_frames[0][0].shape[1]
 
-        # Export frames with correct timing
-        prev_ts = pin_video_frames[0][1]
+        stream.codec_context.width = width
+        stream.codec_context.height = height
+        stream.codec_context.pix_fmt = "yuv420p"
+        stream.codec_context.options = {
+            "preset": "ultrafast",
+            "crf": "23"
+        }
+
+        # CFR time base
+        stream.time_base = Fraction(1, int(fps))
+
+        # PTS increments by 1 per frame
+        pts = 0
 
         for frame, ts in pin_video_frames:
-            # Compute delta time in ms
-            dt_ms = int((ts - prev_ts) * 1000)
-            if dt_ms < 1:
-                dt_ms = 1  # avoid zero-duration frames
-
-            prev_ts = ts
-
-            # Create video frame
             video_frame = av.VideoFrame.from_ndarray(frame, format="bgr24")
+            video_frame.pts = pts
+            pts += 1
 
-            # Assign PTS in milliseconds
-            video_frame.pts = dt_ms
-
-            # Encode
-            packet = stream.encode(video_frame)
-            if packet:
+            for packet in stream.encode(video_frame):
                 container.mux(packet)
 
-        # Flush encoder
-        packet = stream.encode(None)
-        if packet:
+        # Flush
+        for packet in stream.encode(None):
             container.mux(packet)
 
         container.close()
-
-
+        logging.info(f"Exported pin video: {output_path}")

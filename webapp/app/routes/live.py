@@ -15,7 +15,7 @@ def upload_video():
         return "No video uploaded", 400
 
     # Save to disk
-    save_path = "static/videos/latest_pin_video.mp4"
+    save_path = "app/static/videos/latest_pin_video.mp4"
     file.save(save_path)
 
     return "OK", 200

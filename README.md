@@ -1,4 +1,22 @@
 # BowlEye - Bowling Ball Tracker
+
+🚚💨 This repository has packed its bags and *moved house* to my self‑hosted Forgejo instance!
+
+You’ll find the full project, history, issues, and all future development here:
+
+👉 **https://forgejo.helical-penguin.ch/HelicalPenguin/bowleye**
+
+To keep things tidy, independent, and fully under my control, the project now lives on my own Forgejo server.
+This GitHub repo is intentionally reduced to a single README as a friendly signpost.
+
+
+Thanks for stopping by — see you at my place! 😄
+
+HelicalPenguin🐧(formerly AmorphousPhage)
+
+---
+
+# BowlEye - Bowling Ball Tracker
 BowlEye is a camera based bowling ball tracking software which allows you to visualize the path of the bowling ball going down the lane and record a close-up video of the pin action. It is also able to track your score and show you statistical evaluation of your accuracy.
 
 ## Current and planned Features
@@ -28,5 +46,3 @@ To be able to run the software you will need at least:
 - A Laptop running the BowlEye software (will change before final release)
 
 The software is in very early stages. So far it has been tested on one single lane, but in theory supportes multiple lanes at the same time
-
-  
